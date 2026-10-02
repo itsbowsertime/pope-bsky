@@ -12,7 +12,8 @@ because the Pope's @Pontifex posts on X can no longer be read for free.
   `BSKY_APP_PASSWORD` (a Bluesky *app password*, never the real one).
 
 No state is kept: each run reads the account's last 100 posts and skips any
-story already linked. The first run posts only the newest story. At most 5
+story already linked, and posts only stories newer than the newest one it has
+posted. The first run posts only the newest story. At most 5
 posts a run, oldest first; stories older than 48 hours are never posted.
 
 Not affiliated with the Holy See or Vatican News. If the Vatican starts its own

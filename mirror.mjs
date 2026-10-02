@@ -4,7 +4,8 @@
 //
 // No state is stored: before posting, it reads the account's own recent posts
 // and skips any story whose link is already there. On the account's very first
-// run it posts only the newest story, so it never floods the timeline.
+// run it posts only the newest story, and after that only stories newer than
+// the newest one it has posted, so it never floods or posts out of order.
 //
 //   BSKY_HANDLE=… BSKY_APP_PASSWORD=… node mirror.mjs        # post
 //   node mirror.mjs --dry-run                                 # show what it would post
@@ -82,8 +83,12 @@ async function main() {
   if (!handle || !password) throw new Error("BSKY_HANDLE and BSKY_APP_PASSWORD must be set.");
 
   const posted = await alreadyPosted(handle);
-  let fresh = stories.filter((s) => !posted.links.has(s.link));
-  if (posted.count === 0) fresh = fresh.slice(0, 1); // first run: just the newest
+  // Only what's newer than the newest story already posted (the feed is
+  // newest first), so an old story never lands after newer ones. First run:
+  // just the newest.
+  const lastPosted = stories.findIndex((s) => posted.links.has(s.link));
+  let fresh = posted.count === 0 ? stories.slice(0, 1) : stories.slice(0, lastPosted === -1 ? stories.length : lastPosted);
+  fresh = fresh.filter((s) => !posted.links.has(s.link));
   fresh = fresh.slice(0, MAX_PER_RUN).reverse(); // oldest first, so the timeline reads in order
   if (!fresh.length) return console.log("Nothing new.");
 
