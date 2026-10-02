@@ -92,6 +92,41 @@ async function vaticanTexts() {
   return out;
 }
 
+/**
+ * Neutral framing is allowed (The owner, 2026-10-02): "here's what the Pope
+ * posted" is fine; opinion, jokes or reactions are not. Passes only a short
+ * report — "The Pope / Pope Leo + a reporting verb + what he said" — after
+ * quoted words and the tweet's own words are set aside. No I/we/you, no
+ * reaction words, no profanity, no emoji but ⚠️. Narrow on purpose: when in
+ * doubt it says no.
+ */
+const SUBJECT = /^(?:⚠️\s*)?(?:the\s+)?(?:pope(?:\s+leo(?:\s+xiv)?)?|leo\s+xiv|holy\s+father|pontiff)\b/i;
+const REPORTING = /\b(says?|said|calls?(?:\s+for)?|called(?:\s+for)?|urges?|urged|appeals?|appealed|makes?\s+an?\s+appeal|thanks|thanked|expresses|expressed|prays?|prayed|posts?|posted|writes?|wrote|tweets?|tweeted|asks?|asked|warns?|warned|reminds?|reminded|condemns?|condemned|renews?|renewed|invites?|invited|encourages?|encouraged|reflects?|reflected|marks?|marked|offers?|offered)\b/i;
+const PERSONAL = /\b(i|i'm|i’m|i'll|i’ll|me|my|we|we're|our|us|you|you're|your|y'all|ya|imo|lol|lmao|omg|wow|finally|boss|roast\w*|slay\w*|based|king|legend|damn|hell|shit|fuck\w*|wtf|goat|banger)\b/i;
+
+export function neutralFrame(postText, tweet, source = "") {
+  const ref = `${tweet} ${source}`; // his words: the tweet and the Vatican text it came from
+  if (noCommentary(postText, tweet)) return true;
+  // Quoted words must be HIS words — "Pope Leo said “touch grass”" is a joke.
+  for (const [, q] of postText.matchAll(/[“"]([^”"]{3,})[”"]/g)) if (overlap(q, ref) < 0.8) return false;
+  let s = postText.replace(/[“"][^”"]*[”"]/g, " ").replace(/\s+/g, " ").trim();
+  if (!s || s.length > 220) return false;
+  if (/[\p{Extended_Pictographic}]/u.test(s.replace(/⚠️?/g, ""))) return false;
+  if (PERSONAL.test(s) || /!{1,}|\?/.test(s)) return false;
+  const sentences = s.split(/(?<=[.:;])\s+/).filter((x) => x.trim().length > 1);
+  if (sentences.length > 2) return false;
+  const first = sentences[0].trim();
+  // The owner's own example of fine: "here's what the Pope posted".
+  if (/^here(?:'s|’s| is) what (?:the )?(?:pope|pontiff|holy father)(?: leo(?: xiv)?)? (?:just |has |had )?(?:posted|said|tweeted|wrote|shared)(?: (?:today|this morning|tonight|on x|on twitter))?[:.]?$/i.test(first)) return sentences.length === 1;
+  if (!SUBJECT.test(first) || !REPORTING.test(first)) return false;
+  // What follows the verb must be the tweet's own substance ("calls for a
+  // ceasefire"), not a riff on it ("said stop getting Botox"), unless it just
+  // introduces the screenshot with a colon.
+  const after = first.slice(first.search(REPORTING)).replace(REPORTING, "").trim();
+  if (!after || after.replace(/[:\s]+$/, "") === "") return true;
+  return overlap(after, ref) >= 0.6;
+}
+
 /** A search hit → a screenshot candidate, or null. Shared with screenshots-backfill.mjs. */
 export function toCandidate(p) {
   if (p.record.reply || p.embed?.$type?.includes("record")) return null; // replies, quotes
@@ -127,9 +162,12 @@ export function confirmAndPick(group, vaticanTexts) {
   const best = vaticanTexts.map((v) => ({ v, score: overlap(group.tweet, v.text) })).sort((a, b) => b.score - a.score)[0];
   const authors = new Set(group.posts.map((p) => p.author)).size;
   const confirmed = Boolean(best && best.score >= MIN_MATCH && authors >= 2);
+  // No commentary first; then a neutral report ("The Pope calls for…:").
   const clean = group.posts
-    .filter((p) => p.clean && best && overlap(p.tweet, best.v.text) >= MIN_MATCH)
-    .sort((a, b) => b.likes - a.likes || a.at.localeCompare(b.at));
+    .filter((p) => best && overlap(p.tweet, best.v.text) >= MIN_MATCH)
+    .map((p) => ({ ...p, neutral: !p.clean && neutralFrame(p.text, p.tweet, best.v.text) }))
+    .filter((p) => p.clean || p.neutral)
+    .sort((a, b) => Number(a.neutral) - Number(b.neutral) || b.likes - a.likes || a.at.localeCompare(b.at));
   return { best, authors, confirmed, clean, pick: confirmed ? clean[0] ?? null : null };
 }
 

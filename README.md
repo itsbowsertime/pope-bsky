@@ -9,7 +9,8 @@ because the Pope's @Pontifex posts on X can no longer be read for free.
   shows what it would post.
 - `screenshots.mjs` — finds Bluesky posts that are screenshots of @Pontifex
   posts and REPOSTS one clean copy per tweet: the image's alt text must carry
-  the tweet, the poster must add no commentary, and the tweet must match a
+  the tweet, the poster must add no commentary (or only a neutral report:
+  "The Pope calls for a ceasefire in Lebanon:" — no opinion, jokes, I/you), and the tweet must match a
   Vatican News story about the Pope at ≥ 75% of its content words (real
   matches score ~0.8+, unrelated stories ≤ ~0.4), and at least two accounts
   must have posted it, and no reply under its screenshot posts may call it
