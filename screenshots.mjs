@@ -174,11 +174,26 @@ export function confirmAndPick(group, vaticanTexts) {
 /**
  * Replies calling it fake (The owner, 2026-10-02): before a tweet is used, the
  * replies under its screenshot posts are read; any reply that says it's fake,
- * doctored, parody, etc. — or a moderation label on a post — and the whole
- * tweet is skipped. Errs toward skipping: "fake news" about something else
- * also counts, and that's accepted.
+ * doctored, not his account, "is this real?" — or a moderation label on a
+ * post — and the whole tweet is skipped. The claim has to be about THIS post
+ * ("this is fake", "fake tweet", "he never said that"): a bare word like
+ * "AI-generated" in a joke about the tweet's subject doesn't count (it tripped
+ * on Minion jokes under the AI-art tweet, 2026-10-02). Still errs toward skipping.
  */
-const DISPUTE = /\b(fake|faked|not real|isn'?t real|hoax|parody|satire|satirical|doctored|photoshopp?ed|edited|altered|ai[- ]generated|fabricat\w*|made[- ]up|never said|didn'?t say|did not say|not his account|not the real|impostor|imposter|bogus|false)\b/i;
+const IT = String.raw`(?:this|that|it|this one|the (?:tweet|screenshot|post|image|quote|account)|(?:this|that) (?:tweet|screenshot|post|image|quote|pic|picture))`;
+const CLAIM = String.raw`(?:fake|faked|fabricated|doctored|photoshopp?ed|edited|altered|ai[- ]generated|made[- ]up|not real|a parody|parody|satire|satirical|a hoax|hoax|bogus|false|not genuine|not authentic)`;
+const DISPUTE = new RegExp(
+  [
+    String.raw`\b${IT}(?:'s|’s| is| was| looks| seems| must be| has to be| appears)?(?: (?:so|very|obviously|clearly|definitely|probably|totally|100%|a))? ${CLAIM}\b`,
+    String.raw`\b(?:fake|doctored|photoshopped|edited|fabricated|ai[- ]generated|parody|satire) (?:tweet|screenshot|post|image|quote|account)s?\b`,
+    String.raw`\b(?:not|isn'?t|is not|wasn'?t) (?:(?:his|the pope'?s|the real|the actual|an? (?:real|actual)|from (?:his|the)) )+(?:account|tweet|post|pope)\b`,
+    String.raw`\b(?:he|the pope|leo|pope leo) (?:never|didn'?t|did not|doesn'?t|does not) (?:say|said|post|posted|tweet|tweeted|write|wrote)\b`,
+    String.raw`\bis (?:this|that|it) (?:real|legit|genuine|authentic|true)\b`,
+    String.raw`\b(?:source|citation) ?\?`,
+    String.raw`\bcommunity note\b`,
+  ].join("|"),
+  "i",
+);
 
 export async function disputed(posts, auth, max = 10) {
   for (const p of posts.slice(0, max)) {
