@@ -25,9 +25,10 @@ const unescape = (s) =>
 
 export function parseStory(html, url) {
   const meta = (p) => (html.match(new RegExp(`<meta[^>]+(?:property|name)="${p}"[^>]+content="([^"]*)"`)) || [])[1];
-  const title = unescape((html.match(/<h1 class="article__title">([\s\S]*?)<\/h1>/) || [])[1] ?? (meta("og:title") ?? "").replace(/ - Vatican News$/, ""));
-  const summary = unescape((html.match(/<div class="article__subTitle">([\s\S]*?)<\/div>/) || [])[1] ?? meta("og:description") ?? "");
-  const published = meta("article:published_time");
+  const title = unescape((html.match(/<h1 class="article__title"[^>]*>([\s\S]*?)<\/h1>/) || [])[1] ?? (meta("og:title") ?? "").replace(/ - Vatican News$/, ""));
+  const summary = unescape((html.match(/<div class="article__subTitle"[^>]*>([\s\S]*?)<\/div>/) || [])[1] ?? meta("og:description") ?? "");
+  // Some pages (audiences, Angelus) carry the date only in their JSON-LD.
+  const published = meta("article:published_time") ?? (html.match(/"datePublished":\s*"([^"]+)"/) || [])[1];
   // The 750-wide rendition: well under Bluesky's 1 MB image limit.
   const image = meta("og:image")?.replace(/cropped\.\d+\.\d+\.jpeg$/, "cropped.750.422.jpeg") ?? null;
   if (!title || !published) return null;

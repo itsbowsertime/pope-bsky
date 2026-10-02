@@ -11,7 +11,8 @@
 // than repost a fake one"): its wording matches a Vatican News story about the
 // Pope from the days around it at ≥ 0.75 (most @Pontifex posts are lines
 // condensed from his speeches), at least two different accounts posted it, and
-// the reposted post's own alt text matches too. Anything less is skipped.
+// the reposted post's own alt text matches too, and no reply under any of its
+// screenshot posts calls it fake (nor a moderation label). Anything less is skipped.
 // Each tweet is reposted once: the bot's recent reposts are checked first.
 //
 //   node screenshots.mjs --dry-run     # show candidates, scores and the pick
@@ -91,6 +92,77 @@ async function vaticanTexts() {
   return out;
 }
 
+/** A search hit → a screenshot candidate, or null. Shared with screenshots-backfill.mjs. */
+export function toCandidate(p) {
+  if (p.record.reply || p.embed?.$type?.includes("record")) return null; // replies, quotes
+  if (/parody|satire|fake|not the (real )?pope/i.test(`${p.author.displayName ?? ""} ${p.author.handle}`)) return null;
+  const images = p.embed?.images ?? [];
+  if (images.length !== 1) return null; // one clean screenshot
+  const alt = images[0].alt ?? "";
+  if (!/pontifex|pope leo/i.test(alt) || alt.length < 60) return null;
+  if (/screenshot of (my|a) (bluesky|feed|timeline|thread)/i.test(alt)) return null;
+  const tweet = tweetFromAlt(alt);
+  if (content(tweet).length < 6) return null;
+  return { uri: p.uri, cid: p.cid, author: p.author.handle, text: p.record.text ?? "", tweet, likes: p.likeCount ?? 0, at: p.indexedAt, clean: noCommentary(p.record.text ?? "", tweet) };
+}
+
+/** Same wording (≥ 0.8 both ways) = same tweet. */
+export function groupCandidates(candidates) {
+  const groups = [];
+  for (const c of candidates) {
+    const g = groups.find((g) => overlap(c.tweet, g.tweet) >= 0.8 && overlap(g.tweet, c.tweet) >= 0.8);
+    if (g) g.posts.push(c);
+    else groups.push({ tweet: c.tweet, posts: [c] });
+  }
+  return groups;
+}
+
+/**
+ * the owner's rule (2026-10-02): better to miss a real one than repost a fake. All
+ * three: the wording matches a Vatican text at ≥ MIN_MATCH (real ones score
+ * ~0.8+, unrelated stories ≤ ~0.4); at least two different accounts posted
+ * it; and the chosen post's OWN alt text matches too. Returns the pick or null.
+ */
+export function confirmAndPick(group, vaticanTexts) {
+  const best = vaticanTexts.map((v) => ({ v, score: overlap(group.tweet, v.text) })).sort((a, b) => b.score - a.score)[0];
+  const authors = new Set(group.posts.map((p) => p.author)).size;
+  const confirmed = Boolean(best && best.score >= MIN_MATCH && authors >= 2);
+  const clean = group.posts
+    .filter((p) => p.clean && best && overlap(p.tweet, best.v.text) >= MIN_MATCH)
+    .sort((a, b) => b.likes - a.likes || a.at.localeCompare(b.at));
+  return { best, authors, confirmed, clean, pick: confirmed ? clean[0] ?? null : null };
+}
+
+/**
+ * Replies calling it fake (The owner, 2026-10-02): before a tweet is used, the
+ * replies under its screenshot posts are read; any reply that says it's fake,
+ * doctored, parody, etc. — or a moderation label on a post — and the whole
+ * tweet is skipped. Errs toward skipping: "fake news" about something else
+ * also counts, and that's accepted.
+ */
+const DISPUTE = /\b(fake|faked|not real|isn'?t real|hoax|parody|satire|satirical|doctored|photoshopp?ed|edited|altered|ai[- ]generated|fabricat\w*|made[- ]up|never said|didn'?t say|did not say|not his account|not the real|impostor|imposter|bogus|false)\b/i;
+
+export async function disputed(posts, auth, max = 10) {
+  for (const p of posts.slice(0, max)) {
+    const r = await fetch(`https://bsky.social/xrpc/app.bsky.feed.getPostThread?uri=${encodeURIComponent(p.uri)}&depth=2&parentHeight=0`, {
+      headers: { ...auth, "atproto-proxy": "did:web:api.bsky.app#bsky_appview" },
+    });
+    if (!r.ok) return { disputed: true, why: `couldn't read replies (${r.status}) — skipping to be safe` };
+    const j = await r.json();
+    const labels = (j.thread?.post?.labels ?? []).filter((l) => l.src !== j.thread?.post?.author?.did);
+    if (labels.length) return { disputed: true, why: `label "${labels[0].val}" on @${p.author}` };
+    const stack = [...(j.thread?.replies ?? [])];
+    while (stack.length) {
+      const reply = stack.pop();
+      const text = reply?.post?.record?.text ?? "";
+      const m = text.match(DISPUTE);
+      if (m) return { disputed: true, why: `reply under @${p.author}: “${text.slice(0, 80)}”` };
+      stack.push(...(reply?.replies ?? []));
+    }
+  }
+  return { disputed: false };
+}
+
 async function main() {
   const { did, auth } = await login();
 
@@ -100,28 +172,13 @@ async function main() {
     const j = await bsky(`app.bsky.feed.searchPosts?q=${encodeURIComponent(q)}&limit=100&sort=latest`, auth, APPVIEW);
     for (const p of j.posts) seen.set(p.uri, p);
   }
-  const candidates = [];
-  for (const p of seen.values()) {
-    if (Date.now() - new Date(p.indexedAt) > LOOKBACK_HOURS * 3600e3) continue;
-    if (p.record.reply || p.embed?.$type?.includes("record")) continue; // replies, quotes
-    if (/parody|satire|fake|not the (real )?pope/i.test(`${p.author.displayName ?? ""} ${p.author.handle}`)) continue;
-    const images = p.embed?.images ?? [];
-    if (images.length !== 1) continue; // one clean screenshot
-    const alt = images[0].alt ?? "";
-    if (!/pontifex|pope leo/i.test(alt) || alt.length < 60) continue;
-    if (/screenshot of (my|a) (bluesky|feed|timeline|thread)/i.test(alt)) continue;
-    const tweet = tweetFromAlt(alt);
-    if (content(tweet).length < 6) continue;
-    candidates.push({ uri: p.uri, cid: p.cid, author: p.author.handle, text: p.record.text ?? "", tweet, likes: p.likeCount ?? 0, at: p.indexedAt, clean: noCommentary(p.record.text ?? "", tweet) });
-  }
+  const candidates = [...seen.values()]
+    .filter((p) => Date.now() - new Date(p.indexedAt) <= LOOKBACK_HOURS * 3600e3)
+    .map(toCandidate)
+    .filter(Boolean);
 
   // 2. Group by tweet (same wording = same tweet).
-  const groups = [];
-  for (const c of candidates) {
-    const g = groups.find((g) => overlap(c.tweet, g.tweet) >= 0.8 && overlap(g.tweet, c.tweet) >= 0.8);
-    if (g) g.posts.push(c);
-    else groups.push({ tweet: c.tweet, posts: [c] });
-  }
+  const groups = groupCandidates(candidates);
 
   // 3. Already reposted? (the bot's last 100 reposts' subjects)
   const reposts = await bsky(`com.atproto.repo.listRecords?repo=${did}&collection=app.bsky.feed.repost&limit=100`, auth).catch(() => ({ records: [] }));
@@ -129,25 +186,24 @@ async function main() {
   const reposted = subjects.length
     ? (await bsky(`app.bsky.feed.getPosts?${subjects.slice(0, 25).map((u) => `uris=${encodeURIComponent(u)}`).join("&")}`, auth, APPVIEW)).posts.map((p) => tweetFromAlt(p.embed?.images?.[0]?.alt ?? ""))
     : [];
+  // …and tweets the backfill already quote-posted (screenshots-backfill.mjs).
+  const feed = await bsky(`app.bsky.feed.getAuthorFeed?actor=${did}&limit=100&filter=posts_no_replies`, auth, APPVIEW);
+  for (const f of feed.feed) {
+    const quoted = f.post.embed?.$type === "app.bsky.embed.record#view" ? f.post.embed.record : null;
+    const alt = quoted?.embeds?.[0]?.images?.[0]?.alt;
+    if (alt) reposted.push(tweetFromAlt(alt));
+  }
 
   // 4. Confirm against Vatican News, pick, repost.
   const vatican = groups.length ? await vaticanTexts() : [];
   for (const g of groups.sort((a, b) => b.posts.length - a.posts.length)) {
     const done = reposted.some((t) => overlap(g.tweet, t) >= 0.8);
-    const best = vatican.map((v) => ({ v, score: overlap(g.tweet, v.text) })).sort((a, b) => b.score - a.score)[0];
-    // The owner's rule (2026-10-02): better to miss a real one than repost a fake.
-    // So all three: the wording matches a Vatican text at ≥ 0.75 (real ones
-    // score ~0.8+, unrelated stories ≤ ~0.4); at least two different accounts
-    // posted the same tweet; and the reposted post's OWN alt text matches too.
-    const authors = new Set(g.posts.map((p) => p.author)).size;
-    const confirmed = best && best.score >= MIN_MATCH && authors >= 2;
-    const clean = g.posts
-      .filter((p) => p.clean && best && overlap(p.tweet, best.v.text) >= MIN_MATCH)
-      .sort((a, b) => b.likes - a.likes || a.at.localeCompare(b.at));
-    const pick = clean[0];
+    const { best, authors, confirmed, clean, pick } = confirmAndPick(g, vatican);
     console.log(`\n“${g.tweet.slice(0, 110)}…”\n  ${g.posts.length} screenshot posts from ${authors} accounts, ${clean.length} clean and matching; Vatican match ${best ? best.score.toFixed(2) : "-"} ${best ? best.v.link : ""}`);
     console.log(`  ${done ? "already reposted" : !confirmed ? "NOT confirmed — skipped" : !pick ? "no clean post — skipped" : `repost @${pick.author} (${pick.likes} likes): ${pick.text.slice(0, 80) || "(no text)"}`}`);
-    if (DRY || done || !confirmed || !pick) continue;
+    const flag = !done && confirmed && pick ? await disputed([pick, ...g.posts.filter((p) => p !== pick)], auth) : { disputed: false };
+    if (flag.disputed) console.log(`  SKIPPED — someone says it's fake: ${flag.why}`);
+    if (DRY || done || !confirmed || !pick || flag.disputed) continue;
     const r = await fetch(`${PDS}/xrpc/com.atproto.repo.createRecord`, {
       method: "POST",
       headers: { ...auth, "Content-Type": "application/json" },

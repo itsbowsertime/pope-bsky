@@ -1,3 +1,6 @@
 .env
 node_modules
 backfill.json
+screenshots.json
+vatican-bodies.json
+screenshot-picks.json

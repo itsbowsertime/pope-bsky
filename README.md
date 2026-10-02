@@ -12,7 +12,8 @@ because the Pope's @Pontifex posts on X can no longer be read for free.
   the tweet, the poster must add no commentary, and the tweet must match a
   Vatican News story about the Pope at ≥ 75% of its content words (real
   matches score ~0.8+, unrelated stories ≤ ~0.4), and at least two accounts
-  must have posted it. The owner's rule: better to miss a real one than repost a
+  must have posted it, and no reply under its screenshot posts may call it
+  fake (or a moderation label). The owner's rule: better to miss a real one than repost a
   fake. Unconfirmed tweets are skipped. `--dry-run` shows the candidates and the pick.
 - `backfill.mjs` — the one-time backfill of every story since 2025-05-08.
 - `.github/workflows/mirror.yml` — runs both every 30 minutes on GitHub Actions.
