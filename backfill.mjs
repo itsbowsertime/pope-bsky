@@ -10,7 +10,7 @@
 // mirror.yml): its "newer than the newest posted" rule assumes it's alone.
 
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
-import { fit } from "./mirror.mjs";
+import { decode, fit } from "./mirror.mjs";
 
 const SITEMAP = "https://www.vaticannews.va/sitemap.en.xml";
 const SINCE = new Date("2025-05-08T00:00:00+02:00"); // election day, Rome
@@ -20,8 +20,7 @@ const UA = { "User-Agent": "pope-bsky backfill (unofficial; one-time, 1 req/s)" 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const [cmd, ...args] = process.argv.slice(2);
 
-const unescape = (s) =>
-  s.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/\s+/g, " ").trim();
+const unescape = (s) => decode(s);
 
 export function parseStory(html, url) {
   const meta = (p) => (html.match(new RegExp(`<meta[^>]+(?:property|name)="${p}"[^>]+content="([^"]*)"`)) || [])[1];
@@ -116,10 +115,10 @@ async function post() {
     }
     const record = {
       $type: "app.bsky.feed.post",
-      text: fit(s.summary || s.title),
+      text: fit(decode(s.summary) || decode(s.title)),
       createdAt: new Date(s.published).toISOString(),
       langs: ["en"],
-      embed: { $type: "app.bsky.embed.external", external: { uri: s.link, title: s.title, description: fit(s.summary, 280), ...(thumb ? { thumb } : {}) } },
+      embed: { $type: "app.bsky.embed.external", external: { uri: s.link, title: decode(s.title), description: fit(decode(s.summary), 280), ...(thumb ? { thumb } : {}) } },
     };
     for (let attempt = 0; ; attempt++) {
       const r = await fetch(`${PDS}/xrpc/com.atproto.repo.createRecord`, { method: "POST", headers: { ...auth, "Content-Type": "application/json" }, body: JSON.stringify({ repo: did, collection: "app.bsky.feed.post", record }) });

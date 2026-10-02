@@ -17,7 +17,8 @@ const MAX_PER_RUN = 5;
 const MAX_AGE_HOURS = 48; // never post stories older than this
 const DRY = process.argv.includes("--dry-run");
 
-const decode = (s) =>
+/** HTML text → plain text, numeric and named entities included (&#34; showed raw on 2026-10-02). */
+export const decode = (s) =>
   s
     .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
     .replace(/<[^>]+>/g, " ")
@@ -27,6 +28,9 @@ const decode = (s) =>
     .replace(/&#39;|&apos;/g, "'")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&rsquo;/g, "’").replace(/&lsquo;/g, "‘").replace(/&rdquo;/g, "”").replace(/&ldquo;/g, "“").replace(/&hellip;/g, "…").replace(/&mdash;/g, "—").replace(/&ndash;/g, "–")
     .replace(/\s+/g, " ")
     .trim();
 
