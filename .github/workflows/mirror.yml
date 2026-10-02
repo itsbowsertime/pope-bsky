@@ -13,7 +13,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: node mirror.mjs
+      - name: Vatican News stories
+        run: node mirror.mjs
+        env:
+          BSKY_HANDLE: ${{ secrets.BSKY_HANDLE }}
+          BSKY_APP_PASSWORD: ${{ secrets.BSKY_APP_PASSWORD }}
+      - name: Repost confirmed @Pontifex screenshots
+        if: always() # a hiccup in one step shouldn't stop the other
+        run: node screenshots.mjs
         env:
           BSKY_HANDLE: ${{ secrets.BSKY_HANDLE }}
           BSKY_APP_PASSWORD: ${{ secrets.BSKY_APP_PASSWORD }}
