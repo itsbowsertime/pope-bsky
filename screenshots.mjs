@@ -7,9 +7,11 @@
 //   - the poster added no commentary of their own (empty text, or text that
 //     is just the tweet / attribution / hashtags), and
 //   - it isn't a reply, a quote, or from a parody account.
-// A tweet counts as confirmed when its wording closely matches a Vatican News
-// story about the Pope from the days around it (most @Pontifex posts are lines
-// condensed from his speeches). Unconfirmed tweets are skipped and logged.
+// A tweet counts as confirmed only when (The owner: "I'd rather miss some real ones
+// than repost a fake one"): its wording matches a Vatican News story about the
+// Pope from the days around it at ≥ 0.75 (most @Pontifex posts are lines
+// condensed from his speeches), at least two different accounts posted it, and
+// the reposted post's own alt text matches too. Anything less is skipped.
 // Each tweet is reposted once: the bot's recent reposts are checked first.
 //
 //   node screenshots.mjs --dry-run     # show candidates, scores and the pick
@@ -19,6 +21,7 @@ const PDS = "https://bsky.social";
 const APPVIEW = { "atproto-proxy": "did:web:api.bsky.app#bsky_appview" };
 const DRY = process.argv.includes("--dry-run");
 const LOOKBACK_HOURS = 72;
+const MIN_MATCH = 0.75;
 
 export const words = (s) => (s.toLowerCase().normalize("NFKD").match(/[a-z]+/g) ?? []);
 const STOP = new Set("the and for that this with from have will are was were been being their there them they into than then what when where which while who whom whose your yours our ours his her hers its it's about also because more most such only very just can could would should shall may might must not nor but all any each other some own same too out over under again once here why how both few many much".split(" "));
@@ -132,10 +135,17 @@ async function main() {
   for (const g of groups.sort((a, b) => b.posts.length - a.posts.length)) {
     const done = reposted.some((t) => overlap(g.tweet, t) >= 0.8);
     const best = vatican.map((v) => ({ v, score: overlap(g.tweet, v.text) })).sort((a, b) => b.score - a.score)[0];
-    const confirmed = best && best.score >= 0.7;
-    const clean = g.posts.filter((p) => p.clean).sort((a, b) => b.likes - a.likes || a.at.localeCompare(b.at));
+    // The owner's rule (2026-10-02): better to miss a real one than repost a fake.
+    // So all three: the wording matches a Vatican text at ≥ 0.75 (real ones
+    // score ~0.8+, unrelated stories ≤ ~0.4); at least two different accounts
+    // posted the same tweet; and the reposted post's OWN alt text matches too.
+    const authors = new Set(g.posts.map((p) => p.author)).size;
+    const confirmed = best && best.score >= MIN_MATCH && authors >= 2;
+    const clean = g.posts
+      .filter((p) => p.clean && best && overlap(p.tweet, best.v.text) >= MIN_MATCH)
+      .sort((a, b) => b.likes - a.likes || a.at.localeCompare(b.at));
     const pick = clean[0];
-    console.log(`\n“${g.tweet.slice(0, 110)}…”\n  ${g.posts.length} screenshot posts, ${clean.length} without commentary; Vatican match ${best ? best.score.toFixed(2) : "-"} ${best ? best.v.link : ""}`);
+    console.log(`\n“${g.tweet.slice(0, 110)}…”\n  ${g.posts.length} screenshot posts from ${authors} accounts, ${clean.length} clean and matching; Vatican match ${best ? best.score.toFixed(2) : "-"} ${best ? best.v.link : ""}`);
     console.log(`  ${done ? "already reposted" : !confirmed ? "NOT confirmed — skipped" : !pick ? "no clean post — skipped" : `repost @${pick.author} (${pick.likes} likes): ${pick.text.slice(0, 80) || "(no text)"}`}`);
     if (DRY || done || !confirmed || !pick) continue;
     const r = await fetch(`${PDS}/xrpc/com.atproto.repo.createRecord`, {

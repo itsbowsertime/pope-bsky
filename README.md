@@ -10,9 +10,10 @@ because the Pope's @Pontifex posts on X can no longer be read for free.
 - `screenshots.mjs` — finds Bluesky posts that are screenshots of @Pontifex
   posts and REPOSTS one clean copy per tweet: the image's alt text must carry
   the tweet, the poster must add no commentary, and the tweet must match a
-  Vatican News story about the Pope at ≥ 70% of its content words (real
-  matches score ~0.8+, unrelated stories ≤ ~0.4). Unconfirmed tweets are
-  skipped. `--dry-run` shows the candidates and the pick.
+  Vatican News story about the Pope at ≥ 75% of its content words (real
+  matches score ~0.8+, unrelated stories ≤ ~0.4), and at least two accounts
+  must have posted it. The owner's rule: better to miss a real one than repost a
+  fake. Unconfirmed tweets are skipped. `--dry-run` shows the candidates and the pick.
 - `backfill.mjs` — the one-time backfill of every story since 2025-05-08.
 - `.github/workflows/mirror.yml` — runs both every 30 minutes on GitHub Actions.
 - Secrets (repo Settings → Secrets → Actions): `BSKY_HANDLE`,
