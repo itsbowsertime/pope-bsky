@@ -1,0 +1,19 @@
+# pope-bsky
+
+An unofficial, automated Bluesky account that posts every story from
+[Vatican News' "Pope" feed](https://www.vaticannews.va/en/pope.rss.xml) — the
+Vatican's own news service — as it's published. Built 2026-10-02 for the owner
+because the Pope's @Pontifex posts on X can no longer be read for free.
+
+- `mirror.mjs` — the whole thing, no dependencies. `node mirror.mjs --dry-run`
+  shows what it would post.
+- `.github/workflows/mirror.yml` — runs it every 30 minutes on GitHub Actions.
+- Secrets (repo Settings → Secrets → Actions): `BSKY_HANDLE`,
+  `BSKY_APP_PASSWORD` (a Bluesky *app password*, never the real one).
+
+No state is kept: each run reads the account's last 100 posts and skips any
+story already linked. The first run posts only the newest story. At most 5
+posts a run, oldest first; stories older than 48 hours are never posted.
+
+Not affiliated with the Holy See or Vatican News. If the Vatican starts its own
+Bluesky account, turn this off (Actions → mirror → Disable workflow).
