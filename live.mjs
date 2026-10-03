@@ -36,7 +36,19 @@ async function td(path, body, method = body ? "POST" : "GET") {
 
 /** His newest tweets (his own, not retweets), oldest first. */
 async function timeline() {
-  const r = await fetch("https://syndication.twitter.com/srv/timeline-profile/screen-name/Pontifex", { headers: { "User-Agent": "Mozilla/5.0" } });
+  // X allows 30 timeline requests per 30 minutes, shared by everyone viewing his
+  // timeline; they're used up within minutes of each reset (~:10 and :40). So
+  // if it's busy, wait for the reset (if it's ≤ 12 minutes off) and ask first.
+  const get = () => fetch("https://syndication.twitter.com/srv/timeline-profile/screen-name/Pontifex", { headers: { "User-Agent": "Mozilla/5.0" } });
+  let r = await get();
+  if (r.status === 429) {
+    const wait = Number(r.headers.get("x-rate-limit-reset")) * 1000 - Date.now() + 1500;
+    if (wait > 0 && wait <= 12 * 60e3) {
+      console.log(`X's timeline is busy; waiting ${Math.round(wait / 1000)}s for its reset.`);
+      await sleep(wait);
+      r = await get();
+    }
+  }
   const m = (await r.text()).match(/<script id="__NEXT_DATA__" type="application\/json">(.*?)<\/script>/s);
   if (!m) {
     console.log(`X's timeline didn't load (${r.status}); checking screenshots only, trying again next run.`);
