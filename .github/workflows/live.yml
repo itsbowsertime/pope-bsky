@@ -1,7 +1,7 @@
 name: live
+# Started every 30 minutes (:02 and :32) by the Cloudflare Worker in cloudflare/
+# — GitHub's own schedule dropped most runs (2 of ~20 on 2026-10-03).
 on:
-  schedule:
-    - cron: "2,32 * * * *" # every 30 minutes, a few minutes before X's timeline resets (~:10, :40); GitHub often runs late
   workflow_dispatch: {}
 concurrency: live # never two runs at once, so nothing posts twice
 jobs:

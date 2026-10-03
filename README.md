@@ -27,7 +27,7 @@ Everything here uses only free, public sources.
 
 | Script | Job | Status |
 |---|---|---|
-| `live.mjs` | New tweets, every 30 minutes (GitHub Actions, `.github/workflows/live.yml`) | **running** |
+| `live.mjs` | New tweets, every 30 minutes (GitHub Actions, `.github/workflows/live.yml`, started by the Cloudflare Worker in `cloudflare/`) | **running** |
 | `tweets-full.mjs` | The backfill: every tweet from 2025-05-14 to 2026-09-30, and the shared posting code (`shape`, `split`, `postTweet`) | done |
 | `manual-15.json` | The 15 long posts no free source had in full, transcribed from screenshots of X | done |
 | `mirror.mjs`, `screenshots.mjs`, `backfill.mjs`, `tweets-backfill.mjs`, `screenshots-backfill.mjs` | Earlier approaches (Vatican News stories; screenshot reposts; screenshot-style backfill) | retired, kept for reference |
@@ -70,6 +70,10 @@ for duplicates and complete threads.
 - Secrets (repo Settings → Secrets → Actions): `BSKY_HANDLE`,
   `BSKY_APP_PASSWORD` (a Bluesky *app password*), `TODOIST_API_TOKEN`.
 - Run once by hand: `gh workflow run live.yml`; logs: `gh run list --workflow live.yml`.
-- Stop: `gh workflow disable live.yml`. Turn it off for good if the Vatican
+- **The clock:** GitHub's own schedule drops most runs, so a Cloudflare Worker
+  (`cloudflare/`, cron `2,32 * * * *`) starts the workflow. Its `GH_TOKEN` is a
+  fine-grained token for this repo only, Actions read & write. Deploy:
+  `cd cloudflare && npx wrangler deploy`.
+- Stop: `gh workflow disable live.yml` (the Worker's calls then just fail). Turn it off for good if the Vatican
   starts its own Bluesky account.
 - No dependencies — Node 22 only (and tesseract, installed on a run that needs it).

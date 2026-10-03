@@ -24,7 +24,7 @@ holds every decision and why. Read both before changing anything.
 
 ## State of things (update this when it changes)
 
-- **Live job running since 2026-10-03**, every 30 min (`live.yml`). The repo is
+- **Live job running since 2026-10-03**, every 30 min (`live.yml`), **started by a Cloudflare Worker** (`cloudflare/`, the owner's Cloudflare account) because GitHub's schedule dropped most runs. Its `GH_TOKEN` (fine-grained, this repo, Actions r/w) expires — the owner chose the longest option on 2026-10-03; when runs stop, check that first. The repo is
   **private as a 2-day test**; after it, report Actions minutes used (October
   started at 51) and any missed tweets, and ask about making it public
   (unlimited minutes). Private = 2,000 min/month; the wait-for-reset costs

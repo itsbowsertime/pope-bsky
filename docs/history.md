@@ -73,6 +73,11 @@ Newest last. Each entry: what was decided, and why.
 - **First live run:** posted the two Oct 1 tweets, asked for a screenshot of
   the long Oct 2 one (AI and art).
 
+- **GitHub's schedule dropped most runs** (2 of ~20 in the first 10 hours). The
+  screenshot of the Oct 2 post still went through (posted 7:52 am Chicago, a
+  three-post thread). Fix (The owner: "lets do it"): a Cloudflare Worker cron at
+  :02/:32 starts the workflow through GitHub's API; GitHub's own schedule removed.
+
 ## Ideas and open questions
 
 - Make the repo public (unlimited Actions minutes) — the owner's call.
