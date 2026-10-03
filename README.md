@@ -19,7 +19,8 @@ because the Pope's @Pontifex posts on X can no longer be read for free.
 - `backfill.mjs` — the one-time backfill of every story since 2025-05-08.
 - `tweets-backfill.mjs` — the one-time backfill of real @Pontifex tweets:
   the Wayback Machine lists tweet addresses; X's free embed service returns
-  each one's text and time. Posted backdated, with a card linking to X.
+  each one's text and time. Posted backdated as a screenshot of X's own
+  embed (cropped at the date line), full tweet in the alt text, no link.
 - `screenshots-backfill.mjs` — backdated quote posts of confirmed
   screenshots, only for tweets the archive doesn't have.
 - `.github/workflows/mirror.yml` — runs both every 30 minutes on GitHub Actions.

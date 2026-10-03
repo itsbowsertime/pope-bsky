@@ -245,8 +245,9 @@ async function main() {
     const quoted = f.post.embed?.$type === "app.bsky.embed.record#view" ? f.post.embed.record : null;
     const alt = quoted?.embeds?.[0]?.images?.[0]?.alt;
     if (alt) reposted.push(tweetFromAlt(alt));
-    // …and real tweets posted from the archive (tweets-backfill.mjs).
-    if (f.post.embed?.external?.uri?.includes("x.com/Pontifex/status/")) reposted.push(f.post.record.text ?? "");
+    // …and real tweets posted from the archive as screenshots (tweets-backfill.mjs).
+    const ownAlt = f.post.embed?.images?.[0]?.alt;
+    if (ownAlt?.startsWith("Screenshot of a post by Pope Leo XIV (@Pontifex) on X")) reposted.push(tweetFromAlt(ownAlt));
   }
 
   // 4. Confirm against Vatican News, pick, repost.

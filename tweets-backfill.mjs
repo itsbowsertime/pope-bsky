@@ -2,7 +2,10 @@
 // the Internet Archive's Wayback Machine lists @Pontifex tweet addresses, and
 // X's own embed service (the one websites use to show a tweet) returns each
 // one's exact text and time — free, no API key. Each becomes a post on the bot
-// dated at the tweet's time, worded as tweeted, with a card linking to it on X.
+// dated at the tweet's time: a screenshot of X's own embed of the tweet,
+// cropped below the date line, with the full tweet in the alt text and no
+// text or link of its own (The owner's call, 2026-10-02). Rendering needs Chrome
+// and Playwright, so this runs on the Mac.
 //
 // Gaps (the archive thins out after May 2026) are covered by the screenshot
 // quotes; screenshots-backfill.mjs skips any tweet already posted from here.
@@ -11,7 +14,6 @@
 //   node tweets-backfill.mjs post [--limit N] # post what isn't on the account yet, oldest first
 
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
-import { fit } from "./mirror.mjs";
 
 const PDS = "https://bsky.social";
 const SINCE = Date.parse("2025-05-08T00:00:00+02:00");
@@ -74,61 +76,104 @@ async function session() {
   return { did: s.did, pds, auth: { Authorization: `Bearer ${s.accessJwt}` } };
 }
 
+const ALT_PREFIX = "Screenshot of a post by Pope Leo XIV (@Pontifex) on X";
+
+/** X's own embed of the tweet, as a PNG cropped at its date line. */
+async function screenshot(page, id) {
+  await page.goto(`https://platform.twitter.com/embed/Tweet.html?id=${id}&theme=light&hideThread=true&dnt=true&lang=en`, { waitUntil: "networkidle" });
+  await page.locator("article time").first().waitFor({ timeout: 20_000 });
+  await page.waitForTimeout(800); // avatar and fonts
+  const art = await page.locator("article").first().boundingBox();
+  const time = await page.locator("article time").first().boundingBox();
+  const clip = { x: art.x, y: art.y, width: art.width, height: time.y + time.height + 8 - art.y };
+  return { png: await page.screenshot({ clip }), width: Math.round(clip.width * 2), height: Math.round(clip.height * 2) };
+}
+
 async function post() {
   const i = args.indexOf("--limit");
   const limit = i === -1 ? Infinity : Number(args[i + 1]);
   const tweets = JSON.parse(readFileSync(OUT, "utf8")).sort((a, b) => a.at.localeCompare(b.at));
   let { did, pds, auth } = await session();
+  // Already posted = an image post of ours whose createdAt is the tweet's time.
   const posted = new Set();
   let cursor;
   do {
     const r = await fetch(`${pds}/xrpc/com.atproto.repo.listRecords?repo=${did}&collection=app.bsky.feed.post&limit=100${cursor ? `&cursor=${cursor}` : ""}`, { headers: auth });
     const j = await r.json();
-    for (const rec of j.records ?? []) posted.add(rec.value?.embed?.external?.uri);
+    for (const rec of j.records ?? []) if (rec.value?.embed?.images?.[0]?.alt?.startsWith(ALT_PREFIX)) posted.add(new Date(rec.value.createdAt).toISOString());
     cursor = j.cursor;
   } while (cursor);
-  const todo = tweets.filter((t) => !posted.has(t.url)).slice(0, limit);
-  console.log(`${tweets.length} tweets; posting ${todo.length}.`);
-  let n = 0, started = Date.now();
-  for (const t of todo) {
-    if (Date.now() - started > 90 * 60e3) ({ did, pds, auth } = await session()), (started = Date.now());
-    let thumb;
-    if (t.photo) {
+  const todo = tweets.filter((t) => !posted.has(new Date(t.at).toISOString())).slice(0, limit);
+  console.log(`${tweets.length} tweets; ${posted.size} already posted; posting ${todo.length}.`);
+  const { chromium } = await import(process.env.PLAYWRIGHT ?? "playwright");
+  const browser = await chromium.launch({ channel: "chrome" });
+  const page = await browser.newPage({ viewport: { width: 560, height: 1200 }, deviceScaleFactor: 2 });
+  let n = 0, started = Date.now(), failed = 0;
+  try {
+    for (const t of todo) {
+      if (Date.now() - started > 90 * 60e3) ({ did, pds, auth } = await session()), (started = Date.now());
+      let shot;
       try {
-        const img = await fetch(`${t.photo}?name=small`, { headers: UA });
-        const bytes = img.ok ? Buffer.from(await img.arrayBuffer()) : null;
-        if (bytes && bytes.length < 950_000) {
-          const up = await fetch(`${PDS}/xrpc/com.atproto.repo.uploadBlob`, { method: "POST", headers: { ...auth, "Content-Type": img.headers.get("content-type") || "image/jpeg" }, body: bytes });
-          if (up.ok) thumb = (await up.json()).blob;
-        }
-      } catch {}
-    }
-    const when = new Date(t.at).toLocaleDateString("en-US", { timeZone: "Europe/Rome", month: "long", day: "numeric", year: "numeric" });
-    const record = {
-      $type: "app.bsky.feed.post",
-      text: fit(t.text),
-      createdAt: t.at,
-      langs: ["en"],
-      embed: { $type: "app.bsky.embed.external", external: { uri: t.url, title: `Pope Leo XIV (@Pontifex) on X · ${when}`, description: fit(t.text, 280), ...(thumb ? { thumb } : {}) } },
-    };
-    for (let attempt = 0; ; attempt++) {
-      const r = await fetch(`${PDS}/xrpc/com.atproto.repo.createRecord`, { method: "POST", headers: { ...auth, "Content-Type": "application/json" }, body: JSON.stringify({ repo: did, collection: "app.bsky.feed.post", record }) });
-      if (r.ok) break;
-      if (r.status === 429 && attempt < 5) {
-        await sleep(300e3);
+        shot = await screenshot(page, t.id);
+      } catch (e) {
+        console.warn(`couldn't render ${t.id}: ${e.message.split("\n")[0]}`);
+        failed++;
         continue;
       }
-      throw new Error(`post ${t.id} → ${r.status} ${await r.text()}`);
+      const up = await fetch(`${PDS}/xrpc/com.atproto.repo.uploadBlob`, { method: "POST", headers: { ...auth, "Content-Type": "image/png" }, body: shot.png });
+      if (!up.ok) throw new Error(`upload ${t.id} → ${up.status} ${await up.text()}`);
+      const blob = (await up.json()).blob;
+      const when = new Date(t.at).toLocaleDateString("en-US", { timeZone: "Europe/Rome", month: "long", day: "numeric", year: "numeric" });
+      const record = {
+        $type: "app.bsky.feed.post",
+        text: "",
+        createdAt: t.at,
+        langs: ["en"],
+        embed: { $type: "app.bsky.embed.images", images: [{ image: blob, alt: `${ALT_PREFIX}, ${when}: “${t.text}”`, aspectRatio: { width: shot.width, height: shot.height } }] },
+      };
+      for (let attempt = 0; ; attempt++) {
+        const r = await fetch(`${PDS}/xrpc/com.atproto.repo.createRecord`, { method: "POST", headers: { ...auth, "Content-Type": "application/json" }, body: JSON.stringify({ repo: did, collection: "app.bsky.feed.post", record }) });
+        if (r.ok) break;
+        if (r.status === 429 && attempt < 5) {
+          await sleep(300e3);
+          continue;
+        }
+        throw new Error(`post ${t.id} → ${r.status} ${await r.text()}`);
+      }
+      if (++n % 25 === 0 || n === todo.length) console.log(`${n}/${todo.length}  ${t.at.slice(0, 10)}  ${t.text.slice(0, 60)}`);
+      await sleep(2000);
     }
-    if (++n % 25 === 0 || n === todo.length) console.log(`${n}/${todo.length}  ${t.at.slice(0, 10)}  ${t.text.slice(0, 60)}`);
-    await sleep(2500);
+  } finally {
+    await browser.close();
   }
+  if (failed) console.log(`${failed} tweets couldn't be rendered (deleted on X since?) — skipped.`);
+}
+
+/** Remove the earlier text-style tweet posts and samples (one-time tidy-up). */
+async function clearTextStyle() {
+  const { did, pds, auth } = await session();
+  let cursor, n = 0;
+  do {
+    const r = await fetch(`${pds}/xrpc/com.atproto.repo.listRecords?repo=${did}&collection=app.bsky.feed.post&limit=100${cursor ? `&cursor=${cursor}` : ""}`, { headers: auth });
+    const j = await r.json();
+    for (const rec of j.records ?? []) {
+      const v = rec.value;
+      const textStyle = v?.embed?.external?.uri?.includes("x.com/Pontifex/status/");
+      const sample = v?.text === "View on X";
+      if (!textStyle && !sample) continue;
+      const d = await fetch(`${PDS}/xrpc/com.atproto.repo.deleteRecord`, { method: "POST", headers: { ...auth, "Content-Type": "application/json" }, body: JSON.stringify({ repo: did, collection: "app.bsky.feed.post", rkey: rec.uri.split("/").pop() }) });
+      console.log(`deleted ${v.createdAt.slice(0, 16)} ${textStyle ? "text-style tweet" : "sample"} ${d.status}`);
+      n++;
+    }
+    cursor = j.cursor;
+  } while (cursor);
+  console.log(`${n} removed.`);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const run = { fetch: fetchAll, post }[cmd];
+  const run = { fetch: fetchAll, post, "clear-text-style": clearTextStyle }[cmd];
   if (!run) {
-    console.error("usage: node tweets-backfill.mjs fetch | post [--limit N]");
+    console.error("usage: node tweets-backfill.mjs fetch | post [--limit N] | clear-text-style");
     process.exit(1);
   }
   run().catch((e) => {
