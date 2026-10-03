@@ -16,7 +16,7 @@
 //   node screenshots-backfill.mjs post [--limit N]
 
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
-import { confirmAndPick, disputed, groupCandidates, toCandidate } from "./screenshots.mjs";
+import { confirmAndPick, disputed, groupCandidates, overlap, toCandidate } from "./screenshots.mjs";
 
 const PDS = "https://bsky.social";
 const APPVIEW = { "atproto-proxy": "did:web:api.bsky.app#bsky_appview" };
@@ -94,11 +94,18 @@ async function confirm() {
   const stories = JSON.parse(readFileSync(new URL("./backfill.json", import.meta.url), "utf8"));
   const cache = existsSync(BODIES) ? JSON.parse(readFileSync(BODIES, "utf8")) : {};
   const groups = groupCandidates(hits.sort((a, b) => a.at.localeCompare(b.at)));
+  // Tweets the archive already gave us for real (tweets-backfill.mjs) need no screenshot.
+  const real = existsSync(new URL("./tweets.json", import.meta.url)) ? JSON.parse(readFileSync(new URL("./tweets.json", import.meta.url), "utf8")) : [];
   const picks = [];
   const { auth } = await login();
   let n = 0;
   for (const g of groups) {
     const first = Math.min(...g.posts.map((p) => Date.parse(p.at)));
+    const known = real.find((r) => overlap(g.tweet, r.text) >= 0.8);
+    if (known) {
+      console.log(`${new Date(first).toISOString().slice(0, 10)}  =  posted as the real tweet ${known.url.split("/").pop()}  ${g.tweet.slice(0, 60)}`);
+      continue;
+    }
     // A tweet echoes a speech from the days just before it (or the same day).
     const near = stories.filter((s) => {
       const t = Date.parse(s.published);

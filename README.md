@@ -17,6 +17,11 @@ because the Pope's @Pontifex posts on X can no longer be read for free.
   fake (or a moderation label). The owner's rule: better to miss a real one than repost a
   fake. Unconfirmed tweets are skipped. `--dry-run` shows the candidates and the pick.
 - `backfill.mjs` — the one-time backfill of every story since 2025-05-08.
+- `tweets-backfill.mjs` — the one-time backfill of real @Pontifex tweets:
+  the Wayback Machine lists tweet addresses; X's free embed service returns
+  each one's text and time. Posted backdated, with a card linking to X.
+- `screenshots-backfill.mjs` — backdated quote posts of confirmed
+  screenshots, only for tweets the archive doesn't have.
 - `.github/workflows/mirror.yml` — runs both every 30 minutes on GitHub Actions.
 - Secrets (repo Settings → Secrets → Actions): `BSKY_HANDLE`,
   `BSKY_APP_PASSWORD` (a Bluesky *app password*, never the real one).
