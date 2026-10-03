@@ -228,6 +228,10 @@ async function create(auth, did, record) {
       await sleep(300e3);
       continue;
     }
+    if (r.status >= 500 && attempt < 6) {
+      await sleep(15_000 * (attempt + 1)); // Bluesky's passing 502s: wait and retry, so a thread is never left half-posted
+      continue;
+    }
     throw new Error(`post → ${r.status} ${await r.text()}`);
   }
 }
