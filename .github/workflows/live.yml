@@ -1,0 +1,21 @@
+name: live
+on:
+  schedule:
+    - cron: "7,37 * * * *" # every 30 minutes (GitHub may run it a few minutes late)
+  workflow_dispatch: {}
+concurrency: live # never two runs at once, so nothing posts twice
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: New @Pontifex tweets → Bluesky (long ones via a Todoist screenshot)
+        run: node live.mjs
+        env:
+          BSKY_HANDLE: ${{ secrets.BSKY_HANDLE }}
+          BSKY_APP_PASSWORD: ${{ secrets.BSKY_APP_PASSWORD }}
+          TODOIST_API_TOKEN: ${{ secrets.TODOIST_API_TOKEN }}

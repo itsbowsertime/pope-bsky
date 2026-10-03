@@ -36,8 +36,7 @@ export async function embedLookup(id) {
   const r = await fetch(`https://cdn.syndication.twimg.com/tweet-result?id=${id}&lang=en&token=${token}`, { headers: { "User-Agent": "Mozilla/5.0" } });
   const j = r.ok ? await r.json().catch(() => null) : null;
   if (!j?.text || j.user?.screen_name?.toLowerCase() !== "pontifex") return null;
-  if (j.note_tweet) return { id, skip: "long, no full text" };
-  return {
+  const t = {
     id,
     at: new Date(j.created_at).toISOString(),
     text: j.text,
@@ -46,6 +45,8 @@ export async function embedLookup(id) {
     quoted: j.quoted_tweet?.id_str ?? null,
     source: "embed",
   };
+  // A long post: X shows only its first ~280 characters. live.mjs completes it from a screenshot.
+  return j.note_tweet ? { ...t, skip: "long, no full text", partial: true } : t;
 }
 
 async function fetchAll() {
@@ -169,7 +170,7 @@ function facets(text, links, tweetUrl, first) {
 
 // ---------------------------------------------------------------- post
 
-async function session() {
+export async function session() {
   const r = await fetch(`${PDS}/xrpc/com.atproto.server.createSession`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ identifier: process.env.BSKY_HANDLE, password: process.env.BSKY_APP_PASSWORD }) });
   if (!r.ok) throw new Error(`login → ${r.status}`);
   const s = await r.json();
@@ -204,7 +205,7 @@ async function linkCard(auth, href) {
 }
 
 /** Tweet IDs already on the account: the "Posted" link on each thread's first post. */
-async function postedIds(did, pds, auth) {
+export async function postedIds(did, pds, auth) {
   const ids = new Set();
   let cursor;
   do {
@@ -236,49 +237,55 @@ async function create(auth, did, record) {
   }
 }
 
+/** One tweet → a native post (a thread if long). Returns the first post's web link. */
+export async function postTweet({ did, auth }, t, createdAt = t.at) {
+  const tweetUrl = `https://x.com/Pontifex/status/${t.id}`;
+  const { text, links } = shape(t);
+  const parts = split(text);
+  // The embed (photos, or a link card) goes on the last post of the thread.
+  let embed;
+  const photos = t.media.slice(0, 4);
+  if (photos.length) {
+    const images = [];
+    for (const m of photos) {
+      const blob = await upload(auth, m.url);
+      if (blob) images.push({ image: blob, alt: m.alt || (m.type === "photo" ? "Photo from Pope Leo XIV's post on X" : "Preview of the video in Pope Leo XIV's post on X"), aspectRatio: { width: m.width || 1600, height: m.height || 900 } });
+    }
+    if (images.length) embed = { $type: "app.bsky.embed.images", images };
+  } else if (links.length) {
+    const pageLink = links.find((l) => !/(x|twitter)\.com\//.test(l.href));
+    if (pageLink) embed = await linkCard(auth, pageLink.href);
+  }
+  const t0 = Date.parse(createdAt);
+  let root, parent;
+  for (const [k, part] of parts.entries()) {
+    const record = {
+      $type: "app.bsky.feed.post",
+      text: part,
+      facets: facets(part, links, tweetUrl, k === 0),
+      createdAt: new Date(t0 + k * 1000).toISOString(),
+      langs: [t.lang ?? "en"],
+      ...(k === parts.length - 1 && embed ? { embed } : {}),
+      ...(parent ? { reply: { root, parent } } : {}),
+    };
+    const res = await create(auth, did, record);
+    parent = { uri: res.uri, cid: res.cid };
+    root ??= parent;
+    await sleep(1500);
+  }
+  return `https://bsky.app/profile/${process.env.BSKY_HANDLE}/post/${root.uri.split("/").pop()}`;
+}
+
 async function post() {
   const tweets = JSON.parse(readFileSync(OUT, "utf8")).filter((t) => !t.skip).sort((a, b) => a.at.localeCompare(b.at));
-  let { did, pds, auth } = await session();
-  const posted = await postedIds(did, pds, auth);
+  let sess = await session();
+  const posted = await postedIds(sess.did, sess.pds, sess.auth);
   const todo = tweets.filter((t) => !posted.has(t.id)).slice(0, limitArg());
   console.log(`${tweets.length} tweets fetched; ${posted.size} on the account; posting ${todo.length}.`);
   let n = 0, started = Date.now();
   for (const t of todo) {
-    if (Date.now() - started > 90 * 60e3) ({ did, pds, auth } = await session()), (started = Date.now());
-    const tweetUrl = `https://x.com/Pontifex/status/${t.id}`;
-    const { text, links } = shape(t);
-    const parts = split(text);
-    // The embed (photos, or a link card) goes on the last post of the thread.
-    let embed;
-    const photos = t.media.slice(0, 4);
-    if (photos.length) {
-      const images = [];
-      for (const m of photos) {
-        const blob = await upload(auth, m.url);
-        if (blob) images.push({ image: blob, alt: m.alt || (m.type === "photo" ? "Photo from Pope Leo XIV's post on X" : "Preview of the video in Pope Leo XIV's post on X"), aspectRatio: { width: m.width || 1600, height: m.height || 900 } });
-      }
-      if (images.length) embed = { $type: "app.bsky.embed.images", images };
-    } else if (links.length) {
-      const pageLink = links.find((l) => !/(x|twitter)\.com\//.test(l.href));
-      if (pageLink) embed = await linkCard(auth, pageLink.href);
-    }
-    const t0 = Date.parse(t.at);
-    let root, parent;
-    for (const [k, part] of parts.entries()) {
-      const record = {
-        $type: "app.bsky.feed.post",
-        text: part,
-        facets: facets(part, links, tweetUrl, k === 0),
-        createdAt: new Date(t0 + k * 1000).toISOString(),
-        langs: [t.lang ?? "en"],
-        ...(k === parts.length - 1 && embed ? { embed } : {}),
-        ...(parent ? { reply: { root, parent } } : {}),
-      };
-      const res = await create(auth, did, record);
-      parent = { uri: res.uri, cid: res.cid };
-      root ??= parent;
-      await sleep(1500);
-    }
+    if (Date.now() - started > 90 * 60e3) (sess = await session()), (started = Date.now());
+    await postTweet(sess, t);
     if (++n % 10 === 0 || n === todo.length) console.log(`${n}/${todo.length}  ${t.at.slice(0, 10)}  ${t.text.slice(0, 60).replace(/\n/g, " ")}`);
   }
 }

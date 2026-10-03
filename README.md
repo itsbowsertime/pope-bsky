@@ -34,3 +34,7 @@ posts a run, oldest first; stories older than 48 hours are never posted.
 
 Not affiliated with the Holy See or Vatican News. If the Vatican starts its own
 Bluesky account, turn this off (Actions → mirror → Disable workflow).
+
+## Live posting (live.mjs, every 30 minutes — 2026-10-03)
+
+`.github/workflows/live.yml` runs `node live.mjs`. New tweets come from X's embeddable timeline (his 20 newest, no delay). Short ones post at once in the backfill format. A long one (X shows only ~280 characters) becomes a Todoist task for today titled with a link to the tweet; the owner attaches a screenshot and the next run reads it (tesseract), checks the start matches X's own text word for word, posts it and closes the task. A link in the hidden part: the bot asks for it to be pasted as a task comment. If the Internet Archive releases the full text first (2–4 days), that's used instead, and screenshot posts are later checked against it — a mismatch becomes a task. Closing a task by hand skips that tweet. Secrets: BSKY_HANDLE, BSKY_APP_PASSWORD, TODOIST_API_TOKEN. `mirror.mjs`/`screenshots.mjs` (Vatican News, screenshot reposts) are retired.
