@@ -4,7 +4,7 @@ An unofficial Bluesky bot, **@popeleo-bot.bsky.social**, re-posting Pope
 Leo XIV's @Pontifex tweets. README.md explains how it works; `docs/history.md`
 holds every decision and why. Read both before changing anything.
 
-## the owner's rules (each one hers, don't loosen without asking)
+## The owner's rules (each one hers, don't loosen without asking)
 
 - **"I would rather miss some real ones than repost a fake one."** Accuracy
   beats coverage. Nothing posts that wasn't checked against X's own text.
