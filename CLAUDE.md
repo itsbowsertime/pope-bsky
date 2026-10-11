@@ -24,11 +24,12 @@ holds every decision and why. Read both before changing anything.
 
 ## State of things (update this when it changes)
 
-- **Live job running since 2026-10-03**, every 30 min (`live.yml`), **started by a Cloudflare Worker** (`cloudflare/`, the owner's Cloudflare account) because GitHub's schedule dropped most runs. Its `GH_TOKEN` (fine-grained, this repo, Actions r/w) expires — the owner chose the longest option on 2026-10-03; when runs stop, check that first. The repo is
-  **private as a 2-day test**; after it, report Actions minutes used (October
-  started at 51) and any missed tweets, and ask about making it public
-  (unlimited minutes). Private = 2,000 min/month; the wait-for-reset costs
-  ~300–600/day.
+- **Live job running since 2026-10-03**, every 30 min (`live.yml`), **started by a Cloudflare Worker** (`cloudflare/`, the owner's Cloudflare account) because GitHub's schedule dropped most runs. Its `GH_TOKEN` is the fine-grained token `pope-bsky-clock` (this repo only, Actions r/w, no expiry); when runs stop, check that first.
+- **Public since 2026-10-11**, so Actions minutes are free. The history was
+  rewritten before publishing to drop the owner's name and local paths; the
+  pre-rewrite repo is the private `pope-bsky-old` (workflow disabled), and the
+  token was moved from it to this repo. Nothing identifying goes into a commit
+  message or file here.
 - **Account:** 928 backfilled tweets (2025-05-14 → 2026-09-30) + live posts
   from 2026-10-01. Integrity check last run: 0 duplicates, 0 missing, all
   threads complete.
@@ -36,8 +37,6 @@ holds every decision and why. Read both before changing anything.
   rotate it at bsky.app → Settings → App passwords, then update the
   `BSKY_APP_PASSWORD` secret (she runs `gh secret set` — Claude can't write
   secrets).
-- **Making the repo public:** history checked 2026-10-03 — no secrets ever
-  committed. Data files with tweet text are gitignored except `manual-15.json`.
 
 ## Gotchas (each learned the hard way)
 
