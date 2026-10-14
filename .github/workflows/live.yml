@@ -4,16 +4,35 @@ name: live
 on:
   workflow_dispatch: {}
 concurrency: live # never two runs at once, so nothing posts twice
+permissions:
+  actions: read # to see the runs started just before this one
+  contents: read
 jobs:
   post:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      # Cloudflare fires the cron twice, ~6s apart (watched 2026-10-13), so each
+      # tick dispatches two runs. The later one stops here, before asking X for
+      # the timeline a second time. Compared by creation time, not by now: the
+      # concurrency group makes it wait for the first, which can take minutes.
+      - name: Skip a duplicate start
+        id: dup
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          me=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}" --jq '.created_at | fromdateiso8601')
+          n=$(gh api "repos/${{ github.repository }}/actions/workflows/live.yml/runs?per_page=10" --jq "[.workflow_runs[] | select(.id < ${{ github.run_id }}) | select($me - (.created_at | fromdateiso8601) < 120)] | length")
+          echo "runs started in the 2 minutes before this one: $n"
+          echo "n=$n" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v4
+        if: steps.dup.outputs.n == '0'
       - uses: actions/setup-node@v4
+        if: steps.dup.outputs.n == '0'
         with:
           node-version: 22
       - name: New @Pontifex tweets → Bluesky (long ones via a Todoist screenshot)
+        if: steps.dup.outputs.n == '0'
         run: node live.mjs
         env:
           BSKY_HANDLE: ${{ secrets.BSKY_HANDLE }}
