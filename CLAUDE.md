@@ -40,6 +40,11 @@ holds every decision and why. Read both before changing anything.
 
 ## Gotchas (each learned the hard way)
 
+- **Cloudflare fires the cron twice, ~6s apart** (watched with `wrangler tail`,
+  2026-10-13; one Worker, one schedule). So every tick dispatches two runs;
+  `live.yml`'s first step stops the later one before it asks X anything. Two
+  runs per tick in the Actions list is expected, the second all-skipped.
+
 - **The account's posts live on its own PDS**, not bsky.social: take the
   service endpoint from `createSession`'s `didDoc` for `listRecords`.
 - **Searching Bluesky needs a login** (`atproto-proxy` header), not the public API.
