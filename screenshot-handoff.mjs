@@ -30,7 +30,12 @@ const shown = issue.body.match(/\n~~~text\n([\s\S]*?)\n~~~/)?.[1];
 if (!shown) stop(`#${n} has no X text in its body.`);
 const partial = { id, text: shown, urls: [] };
 
-const ocr = execFileSync("tesseract", [image, "-", "--psm", "4"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+let ocr;
+try {
+  ocr = execFileSync("tesseract", [image, "-", "--psm", "4"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+} catch {
+  stop(`tesseract couldn't read ${image} — is it a picture (PNG/JPG)? (brew install tesseract if it's missing)`);
+}
 let read = readScreenshot(ocr, partial);
 if (read.problem === "link") {
   if (!link) stop("The hidden part has a link, which can't be read off a picture. On X, right-click the link → Copy Link Address, then run this again with --link <url>.");
