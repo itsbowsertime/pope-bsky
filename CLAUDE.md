@@ -28,7 +28,7 @@ holds every decision and why. Read both before changing anything.
 ## State of things (update this when it changes)
 
 **Next:** Watch the first real long post go through the `needs-screenshot` issue flow (`docs/screenshots.md`).
-**Waiting on Anna:** deleting the old app password at bsky.app → Settings → App passwords, if not done (the new one is set; 2026-10-26).
+**Waiting on Anna:** nothing.
 **Updated:** 2026-10-26
 
 - **Live job running since 2026-10-03**, every 30 min (`live.yml`), **started by a Cloudflare Worker** (`cloudflare/`, the owner's Cloudflare account) because GitHub's schedule dropped most runs. Its `GH_TOKEN` is the fine-grained token `pope-bsky-clock` (this repo only, Actions r/w, no expiry); when runs stop, check that first.
