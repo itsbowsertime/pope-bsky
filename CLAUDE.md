@@ -46,6 +46,11 @@ holds every decision and why. Read both before changing anything.
 
 ## Gotchas (each learned the hard way)
 
+- **GitHub doesn't notify the owner about the bot's issues** (checked
+  2026-10-26: the owner doesn't watch this repo, so a `needs-screenshot` issue
+  opened by `github-actions[bot]` sent nothing). The assistant's greeting check
+  (`gh issue list --label needs-screenshot`) is the only alert.
+
 - **Cloudflare fires the cron twice, ~6s apart** (watched with `wrangler tail`,
   2026-10-13; one Worker, one schedule). So every tick dispatches two runs;
   `live.yml`'s first step stops the later one before it asks X anything. Two
