@@ -46,6 +46,14 @@ Everything here uses only free, public sources.
    run. X's exact text is kept for the part X shows; only the rest comes from
    the picture, and the picture must match X's visible text at ≥ 95% or
    nothing posts (the task gets a comment saying why).
+   - Or share the screenshot to Todoist from the phone (Photos → Share →
+     Todoist, any name): it becomes a new Inbox task, and the bot uses its
+     picture for whichever waiting post it matches (same ≥ 95% check), then
+     closes that task too. Only Inbox tasks from the last 7 days with no
+     description are looked at, and none of them is ever logged.
+   - A picture that reaches the time line ("6:00 AM · Oct 18, 2026") holds
+     the whole post, so even a few hidden characters count; without it, the
+     picture must show at least 10 characters beyond X's free text.
    - A link in the hidden part can't be read off a picture: the bot asks, in
      a task comment, for the link to be pasted as a comment.
    - The Internet Archive saves every tweet within seconds but releases them

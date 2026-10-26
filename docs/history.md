@@ -78,6 +78,23 @@ Newest last. Each entry: what was decided, and why.
   three-post thread). Fix (The owner: "lets do it"): a Cloudflare Worker cron at
   :02/:32 starts the workflow through GitHub's API; GitHub's own schedule removed.
 
+## 2026-10-26 — Screenshots from the phone
+
+- **Tested: can the Mac fetch long posts itself?** A fresh, logged-out
+  automated Chrome got **403 Forbidden** from x.com on every post, before any
+  page loaded (a plain request got 200, so it's the automation X refuses).
+  Getting past that would mean disguising the browser — not a free public
+  source, and fragile. Dropped.
+- **Instead: share the screenshot to Todoist** (Photos → Share → Todoist). The
+  owner tested it: it makes a new Inbox task (Todoist insists on a name) with
+  the picture as an `image/png` comment — the same kind the bot already reads.
+  The bot now matches such pictures to waiting posts by their text, so the
+  owner never picks a task. Chosen over an iPhone Shortcut, which would need
+  a copy of the Todoist token on the phone.
+- **The 10-character rule was too strict:** the Oct 18 post's hidden part is
+  only "22:15-21)" (9). A picture down to the time line now counts with any
+  hidden part; without the time line, 10 characters are still required.
+
 ## Ideas and open questions
 
 - Make the repo public (unlimited Actions minutes) — the owner's call.

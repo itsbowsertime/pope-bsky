@@ -13,6 +13,9 @@
 //      are checked against it then, and a mismatch becomes a task.
 //    - a link in the hidden part can't be read off a picture: the bot asks
 //      (a task comment) for the link to be pasted as a comment.
+//    - or the screenshot is shared to Todoist from the phone (Photos → Share →
+//      Todoist): a new Inbox task, named anything. Its picture counts for the
+//      long post whose visible text it matches; that task is closed with it.
 //    Completing or deleting the task by hand = skip that tweet.
 
 import { execSync } from "node:child_process";
@@ -131,7 +134,9 @@ export function readScreenshot(ocr, partial) {
   }
   if (cut.score < 0.95) return { problem: `the picture's text doesn't match what X shows (${Math.round(cut.score * 100)}%)` };
   const rest = fromStart.slice(cut.len).trim();
-  if (rest.length < 10) return { problem: "the picture shows no more than X does — is it the whole post?" };
+  // A picture down to the time line holds the whole post, so a short hidden part ("22:15-21)") is real.
+  const toTime = lines.some((l) => /^\d{1,2}:\d{2}\s*[AP]M\b/i.test(l));
+  if (rest.length < (toTime ? 1 : 10)) return { problem: "the picture shows no more than X does — is it the whole post?" };
   if (/\b[a-z0-9-]+\.(va|com|org|net|it|ly|co|be|gl)\/\S*/i.test(rest)) return { problem: "link" };
   // Join: X's exact text (keeping its line breaks), then the rest from the picture.
   return { text: `${shown.replace(/\s+$/, "")}${/^[,.;:!?]/.test(rest) ? "" : " "}${rest}`.replace(/\s*(#\w+)\s*$/, " $1") };
@@ -147,6 +152,11 @@ function ocr(png) {
   return execSync("tesseract /tmp/shot.png - --psm 4 2>/dev/null").toString();
 }
 
+const picture = (comments) => comments.filter((c) => c.file_attachment?.file_type?.startsWith("image/")).at(-1);
+const download = async (c) => Buffer.from(await (await fetch(c.file_attachment.file_url, { headers: { Authorization: `Bearer ${process.env.TODOIST_API_TOKEN}` } })).arrayBuffer());
+// The picture is of this post: X's visible text matched (≥ 95%), whatever else is wrong with it.
+const isOf = (read) => !read.problem || read.problem === "link" || read.problem.startsWith("the picture shows no more");
+
 // ---------------------------------------------------------------- the run
 
 const taskTitle = (id) => `[📸 Screenshot the Pope's long post on X](${tweetUrl(id)})`;
@@ -154,12 +164,26 @@ const taskTitle = (id) => `[📸 Screenshot the Pope's long post on X](${tweetUr
 async function run() {
   const sess = await session();
   const posted = await postedIds(sess.did, sess.pds, sess.auth);
-  const open = [];
+  const all = [];
   for (let cursor; ; ) {
     const j = await td(`/tasks?limit=200${cursor ? `&cursor=${cursor}` : ""}`);
-    open.push(...j.results.filter((t) => t.content.includes("Screenshot the Pope") && idIn(t.content)));
+    all.push(...j.results);
     if (!(cursor = j.next_cursor)) break;
   }
+  const open = all.filter((t) => t.content.includes("Screenshot the Pope") && idIn(t.content));
+  // Screenshots shared from the phone: Inbox tasks from the last week with a picture,
+  // looked up only when a long post is still waiting. Never logged (they're the owner's Inbox).
+  let shared;
+  const sharedShots = async () => {
+    if (shared) return shared;
+    const inbox = (await td("/projects")).results.find((p) => p.inbox_project)?.id;
+    shared = [];
+    for (const t of all.filter((t) => t.project_id === inbox && !idIn(t.content) && !t.description && Date.parse(t.added_at) > Date.now() - 7 * 864e5)) {
+      const pic = picture((await td(`/comments?task_id=${t.id}`)).results);
+      if (pic) shared.push({ task: t, pic });
+    }
+    return shared;
+  };
   const since = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 19);
   const done = (await td(`/tasks/completed/by_completion_date?since=${since}&until=${new Date().toISOString().slice(0, 19)}&limit=200`)).items.filter((t) => t.content.includes("Screenshot the Pope") && idIn(t.content));
   const openFor = new Map(open.map((t) => [idIn(t.content), t]));
@@ -185,7 +209,7 @@ async function run() {
     if (!task) {
       await td("/tasks", {
         content: taskTitle(id),
-        description: `Tap the title to open it on X, screenshot the whole post, and attach the picture here (comments → 📎). The bot checks every 30 minutes.\n\nIt starts: “${visible(tw).slice(0, 120)}…”\n${tweetUrl(id)}`,
+        description: `Tap the title to open it on X, screenshot the whole post, and attach the picture here (comments → 📎) — or share the screenshot to Todoist (any name). The bot checks every 30 minutes.\n\nIt starts: “${visible(tw).slice(0, 120)}…”\n${tweetUrl(id)}`,
         due_string: "today",
       });
       report.push(`asked for a screenshot of ${id}`);
@@ -194,18 +218,30 @@ async function run() {
     const comments = (await td(`/comments?task_id=${task.id}`)).results;
     const said = (s) => comments.some((c) => c.content.startsWith(BOT) && c.content.includes(s));
     let full = await fromArchive(tw);
+    let from = null; // the shared-from-the-phone task the picture came from
     if (!full) {
-      const shot = comments.filter((c) => c.file_attachment?.file_type?.startsWith("image/")).at(-1);
-      if (!shot) continue;
-      const png = Buffer.from(await (await fetch(shot.file_attachment.file_url, { headers: { Authorization: `Bearer ${process.env.TODOIST_API_TOKEN}` } })).arrayBuffer());
-      const read = readScreenshot(ocr(png), tw);
+      const shot = picture(comments);
+      let text, read;
+      if (shot) read = readScreenshot((text = ocr(await download(shot))), tw);
+      else {
+        for (const s of await sharedShots()) {
+          if (s.used) continue;
+          s.text ??= ocr(await download(s.pic));
+          const r = readScreenshot(s.text, tw);
+          if (isOf(r)) {
+            [from, text, read, s.used] = [s.task, s.text, r, true];
+            break;
+          }
+        }
+        if (!from) continue;
+      }
       if (read.problem === "link") {
         const pasted = comments.filter((c) => !c.content.startsWith(BOT)).map((c) => c.content.match(/https?:\/\/\S+/)?.[0]).filter(Boolean).at(-1);
         if (!pasted) {
           if (!said("link")) await td("/comments", { task_id: task.id, content: `${BOT} the hidden part of this post has a link I can't read off a picture. Paste the link (tap it on X → copy) as a comment here and I'll post it.` });
           continue;
         }
-        const r2 = readScreenshot(ocr(png).replace(/\b[a-z0-9-]+\.(va|com|org|net|it|ly|co|be|gl)\/\S*/i, "LINKHERE"), tw);
+        const r2 = readScreenshot(text.replace(/\b[a-z0-9-]+\.(va|com|org|net|it|ly|co|be|gl)\/\S*/i, "LINKHERE"), tw);
         if (r2.problem && r2.problem !== "link") read.problem = r2.problem;
         else {
           full = { ...tw, text: r2.text.replace("LINKHERE", "https://t.co/pasted"), urls: [...tw.urls, { url: "https://t.co/pasted", expanded_url: pasted }], source: "screenshot" };
@@ -219,7 +255,8 @@ async function run() {
     const link = await postTweet(sess, full, when);
     await td("/comments", { task_id: task.id, content: `${BOT} posted from the ${full.source === "archive" ? "Internet Archive's copy" : "screenshot"}: ${link}${full.source === "screenshot" ? "\n[unchecked]" : ""}` });
     await td(`/tasks/${task.id}/close`, {});
-    report.push(`posted long ${id} (${full.source}): ${link}`);
+    if (from) await td(`/tasks/${from.id}/close`, {});
+    report.push(`posted long ${id} (${full.source}${from ? ", shared" : ""}): ${link}`);
   }
 
   // Posts made from a screenshot: check them against the Archive's copy once it's out.

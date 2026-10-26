@@ -15,7 +15,9 @@ holds every decision and why. Read both before changing anything.
 - **Native text posts, not screenshots.** Tried and dropped (X's embed cut long
   posts off with "Show more").
 - **Long posts she can't get free → a Todoist task with the tweet link as its
-  title**; she attaches a screenshot. Don't invent other ways to fill text.
+  title**; she attaches a screenshot, or shares it to Todoist from her phone
+  (a new Inbox task, matched by its text; 2026-10-26). Don't invent other
+  ways to fill text.
 - **Deleted by him → delete ours.** (2026-09-30: he deleted a thread with a
   typo and re-posted it; the deleted copy was removed.)
 - **Don't pay X, and don't log in to X.** Free public sources only.
@@ -25,8 +27,8 @@ holds every decision and why. Read both before changing anything.
 ## State of things (update this when it changes)
 
 **Next:** Rotate the bot's app password (pasted in chat 2026-10-02), then update the `BSKY_APP_PASSWORD` secret.
-**Waiting on Anna:** the rotation; 1 overdue screenshot task in Todoist (Oct 18).
-**Updated:** 2026-10-25
+**Waiting on Anna:** the rotation; 5 screenshot tasks (Oct 25 ×4, Oct 26) — share each screenshot to Todoist from the phone.
+**Updated:** 2026-10-26
 
 - **Live job running since 2026-10-03**, every 30 min (`live.yml`), **started by a Cloudflare Worker** (`cloudflare/`, the owner's Cloudflare account) because GitHub's schedule dropped most runs. Its `GH_TOKEN` is the fine-grained token `pope-bsky-clock` (this repo only, Actions r/w, no expiry); when runs stop, check that first.
 - **Public since 2026-10-11**, so Actions minutes are free. The history was
@@ -48,6 +50,10 @@ holds every decision and why. Read both before changing anything.
   2026-10-13; one Worker, one schedule). So every tick dispatches two runs;
   `live.yml`'s first step stops the later one before it asks X anything. Two
   runs per tick in the Actions list is expected, the second all-skipped.
+
+- **x.com answers an automated browser with 403** (headless Chrome, fresh
+  profile, 2026-10-26), so the bot can't fetch long posts itself. Getting
+  past it means disguising the browser — don't.
 
 - **The account's posts live on its own PDS**, not bsky.social: take the
   service endpoint from `createSession`'s `didDoc` for `listRecords`.
