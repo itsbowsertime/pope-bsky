@@ -14,10 +14,11 @@ holds every decision and why. Read both before changing anything.
   exact wording — not a link). Show her a sample before changing it.
 - **Native text posts, not screenshots.** Tried and dropped (X's embed cut long
   posts off with "Show more").
-- **Long posts she can't get free → a Todoist task with the tweet link as its
-  title**; she attaches a screenshot, or shares it to Todoist from her phone
-  (a new Inbox task, matched by its text; 2026-10-26). Don't invent other
-  ways to fill text.
+- **Long posts she can't get free → a `needs-screenshot` GitHub issue** with
+  the tweet link as its title (2026-10-26, replacing Todoist). She screenshots
+  it on the Mac with Claude; `node screenshot-handoff.mjs <issue> <image>`
+  hands the text over (`docs/screenshots.md`). Don't invent other ways to
+  fill text, and the bot trusts only the repo owner's handoff comments.
 - **Deleted by him → delete ours.** (2026-09-30: he deleted a thread with a
   typo and re-posted it; the deleted copy was removed.)
 - **Don't pay X, and don't log in to X.** Free public sources only.
@@ -27,7 +28,7 @@ holds every decision and why. Read both before changing anything.
 ## State of things (update this when it changes)
 
 **Next:** Rotate the bot's app password (pasted in chat 2026-10-02), then update the `BSKY_APP_PASSWORD` secret.
-**Waiting on Anna:** the rotation. (No screenshot tasks open; the share-from-phone route is built but not yet used live.)
+**Waiting on Anna:** the rotation; then her OK to delete the old `TODOIST_API_TOKEN` secret (the bot no longer uses it).
 **Updated:** 2026-10-26
 
 - **Live job running since 2026-10-03**, every 30 min (`live.yml`), **started by a Cloudflare Worker** (`cloudflare/`, the owner's Cloudflare account) because GitHub's schedule dropped most runs. Its `GH_TOKEN` is the fine-grained token `pope-bsky-clock` (this repo only, Actions r/w, no expiry); when runs stop, check that first.
@@ -79,7 +80,11 @@ gh workflow run live.yml                 # run now
 gh run list --workflow live.yml          # recent runs
 gh run view <id> --log | grep -v '##'    # a run's output
 node tweets-full.mjs post                # post any backfill tweet not yet on the account
+gh issue list --label needs-screenshot    # long posts waiting for a screenshot
+node screenshot-handoff.mjs <issue> <image> [--link <url>] [--send]   # docs/screenshots.md
 ```
 
 Local runs need `BSKY_HANDLE`, `BSKY_APP_PASSWORD`, and for `live.mjs`
-`TODOIST_API_TOKEN` (another project's `.env.local` has it).
+`GITHUB_TOKEN` (`gh auth token`), `GITHUB_REPOSITORY`, `GITHUB_REPOSITORY_OWNER`.
+Test without posting: `gh workflow run live.yml -f test=<a long tweet's ID>`
+(opens or reads that tweet's issue; nothing goes to Bluesky).

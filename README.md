@@ -28,6 +28,7 @@ Everything here uses only free, public sources.
 | Script | Job | Status |
 |---|---|---|
 | `live.mjs` | New tweets, every 30 minutes (GitHub Actions, `.github/workflows/live.yml`, started by the Cloudflare Worker in `cloudflare/`) | **running** |
+| `screenshot-handoff.mjs` | The Mac side of a long post: a screenshot → its full text, as a comment on its issue | in use |
 | `tweets-full.mjs` | The backfill: every tweet from 2025-05-14 to 2026-09-30, and the shared posting code (`shape`, `split`, `postTweet`) | done |
 | `manual-15.json` | The 15 long posts no free source had in full, transcribed from screenshots of X | done |
 | `mirror.mjs`, `screenshots.mjs`, `backfill.mjs`, `tweets-backfill.mjs`, `screenshots-backfill.mjs` | Earlier approaches (Vatican News stories; screenshot reposts; screenshot-style backfill) | retired, kept for reference |
@@ -41,30 +42,25 @@ Everything here uses only free, public sources.
    gives (if it's ≤ 12 minutes away) and asks in the first second.
 2. **Short tweets** (most of them) post at once, at the tweet's own time.
 3. **Long tweets** — X's free services show only the first ~280 characters. The
-   job adds a Todoist task for today whose title links to the tweet. A
-   screenshot attached to the task is read with tesseract (OCR) on the next
-   run. X's exact text is kept for the part X shows; only the rest comes from
-   the picture, and the picture must match X's visible text at ≥ 95% or
-   nothing posts (the task gets a comment saying why).
-   - Or share the screenshot to Todoist from the phone (Photos → Share →
-     Todoist, any name): it becomes a new Inbox task, and the bot uses its
-     picture for whichever waiting post it matches (same ≥ 95% check), then
-     closes that task too. Only Inbox tasks from the last 7 days with no
-     description are looked at, and none of them is ever logged.
-   - A picture that reaches the time line ("6:00 AM · Oct 18, 2026") holds
-     the whole post, so even a few hidden characters count; without it, the
-     picture must show at least 10 characters beyond X's free text. If it
-     shows nothing beyond X's text, X's text is the whole post (X marks some
-     short posts as long) and is posted as is.
-   - A link in the hidden part can't be read off a picture: the bot asks, in
-     a task comment, for the link to be pasted as a comment.
+   job opens a GitHub issue here, labeled `needs-screenshot` and locked, titled
+   with the tweet's link, its body holding what X shows. The owner screenshots
+   the post on the Mac and `screenshot-handoff.mjs` reads it (tesseract OCR),
+   shows the hidden part, and comments the full text on the issue
+   (walk-through: [docs/screenshots.md](docs/screenshots.md)). The next run
+   posts it and closes the issue.
+   - Only the repo owner's handoff comment counts, and the bot checks it again:
+     X's exact text is kept for the part X shows, and that part must match at
+     ≥ 95% or nothing posts (the issue gets a comment saying why).
+   - A link in the hidden part can't be read off a picture: the handoff takes
+     it with `--link`.
    - The Internet Archive saves every tweet within seconds but releases them
      2–4 days later. If its copy arrives before a screenshot, that's used
-     instead; posts made from a screenshot are compared with it later, and a
-     mismatch becomes a new task.
-   - Completing the task by hand = skip that tweet.
+     instead; posts made from a screenshot are labeled `unchecked` and compared
+     with it later, and a mismatch opens a `post-differs` issue.
+   - Closing the issue by hand = skip that tweet.
 4. **No saved state.** Each run reads the account's posts (the "Posted" link
-   holds the tweet ID) and the Todoist tasks, so a run can never double-post.
+   holds the tweet ID) and the issues, so a run can never double-post or ask twice.
+   Test without posting: `gh workflow run live.yml -f test=<a long tweet's ID>`.
 
 ### The backfill (`tweets-full.mjs`)
 
@@ -78,7 +74,8 @@ for duplicates and complete threads.
 ## Running it
 
 - Secrets (repo Settings → Secrets → Actions): `BSKY_HANDLE`,
-  `BSKY_APP_PASSWORD` (a Bluesky *app password*), `TODOIST_API_TOKEN`.
+  `BSKY_APP_PASSWORD` (a Bluesky *app password*). The issues use the run's own
+  `GITHUB_TOKEN`.
 - Run once by hand: `gh workflow run live.yml`; logs: `gh run list --workflow live.yml`.
 - **The clock:** GitHub's own schedule drops most runs, so a Cloudflare Worker
   (`cloudflare/`, cron `2,32 * * * *`) starts the workflow. Its `GH_TOKEN` is a
@@ -86,4 +83,4 @@ for duplicates and complete threads.
   `cd cloudflare && npx wrangler deploy`.
 - Stop: `gh workflow disable live.yml` (the Worker's calls then just fail). Turn it off for good if the Vatican
   starts its own Bluesky account.
-- No dependencies — Node 22 only (and tesseract, installed on a run that needs it).
+- No dependencies — Node 22 only (and tesseract on the Mac, for the handoff).

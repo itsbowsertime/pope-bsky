@@ -103,6 +103,33 @@ Newest last. Each entry: what was decided, and why.
   OCR-matches each to its post with `readScreenshot`, shows the hidden parts,
   and attaches them to the tasks through Todoist's API (`/uploads`, then a comment).
 
+## 2026-10-26 — GitHub issues instead of Todoist
+
+- **Todoist retired from the bot** (the owner's decision). The job, in a public
+  repo, held a full-access Todoist token, which by then also read her Inbox
+  for shared screenshots; nothing needed Todoist. Screenshots are now done on
+  the Mac with Claude.
+- **A long post → a `needs-screenshot` issue** opened with the run's own
+  `GITHUB_TOKEN` (no new secret), titled with the tweet link, its body holding
+  X's visible text. Locked as it opens, so only collaborators can comment (the
+  owner's tweak). Existing issues are found by search on the tweet ID, plus a
+  direct list of the last 2 days' closed ones (search can lag), so it scales
+  past any number of issues (her tweak).
+- **The handoff:** `screenshot-handoff.mjs <issue> <image>` reads the picture
+  on the Mac with the same `readScreenshot` checks, taking X's text from the
+  issue body (her tweak: nothing asked of X), shows the hidden part, and with
+  `--send` comments the full text in a fixed format. It needs only `gh`.
+- **The bot trusts only the repo owner's comments** (login and `OWNER`
+  association, on an issue the bot opened), and checks the text against X's
+  visible part again (≥ 95%) before posting; X's own words are kept for that part.
+- Posted → comment with the link, issue closed. Closed by hand = skip.
+  Screenshot posts are labeled `unchecked` until compared with the Archive;
+  a mismatch opens a `post-differs` issue.
+- Removed: Todoist tasks, task checks, and the share-from-the-phone Inbox route.
+  Every earlier Todoist screenshot task had been posted, so nothing carried over.
+- `gh workflow run live.yml -f test=<id>`: a test run for one long tweet
+  that opens or reads its issue and posts nothing to Bluesky.
+
 ## Ideas and open questions
 
 - Make the repo public (unlimited Actions minutes) — the owner's call.

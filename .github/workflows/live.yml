@@ -2,11 +2,16 @@ name: live
 # Started every 30 minutes (:02 and :32) by the Cloudflare Worker in cloudflare/
 # — GitHub's own schedule dropped most runs (2 of ~20 on 2026-10-03), so it has none.
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      test:
+        description: "Test only: a long tweet's ID. Opens or reads its issue; posts nothing to Bluesky."
+        required: false
 concurrency: live # never two runs at once, so nothing posts twice
 permissions:
   actions: read # to see the runs started just before this one
   contents: read
+  issues: write # long posts wait in needs-screenshot issues
 jobs:
   post:
     runs-on: ubuntu-latest
@@ -31,10 +36,11 @@ jobs:
         if: steps.dup.outputs.n == '0'
         with:
           node-version: 22
-      - name: New @Pontifex tweets → Bluesky (long ones via a Todoist screenshot)
+      - name: New @Pontifex tweets → Bluesky (long ones via a needs-screenshot issue)
         if: steps.dup.outputs.n == '0'
         run: node live.mjs
         env:
           BSKY_HANDLE: ${{ secrets.BSKY_HANDLE }}
           BSKY_APP_PASSWORD: ${{ secrets.BSKY_APP_PASSWORD }}
-          TODOIST_API_TOKEN: ${{ secrets.TODOIST_API_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+          TEST_ID: ${{ inputs.test }}
