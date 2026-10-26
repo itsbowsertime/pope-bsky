@@ -28,7 +28,7 @@ holds every decision and why. Read both before changing anything.
 ## State of things (update this when it changes)
 
 **Next:** Rotate the bot's app password (pasted in chat 2026-10-02), then update the `BSKY_APP_PASSWORD` secret.
-**Waiting on Anna:** the rotation; then her OK to delete the old `TODOIST_API_TOKEN` secret (the bot no longer uses it).
+**Waiting on Anna:** the rotation.
 **Updated:** 2026-10-26
 
 - **Live job running since 2026-10-03**, every 30 min (`live.yml`), **started by a Cloudflare Worker** (`cloudflare/`, the owner's Cloudflare account) because GitHub's schedule dropped most runs. Its `GH_TOKEN` is the fine-grained token `pope-bsky-clock` (this repo only, Actions r/w, no expiry); when runs stop, check that first.
