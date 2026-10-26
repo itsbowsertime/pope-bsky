@@ -53,7 +53,9 @@ Everything here uses only free, public sources.
      description are looked at, and none of them is ever logged.
    - A picture that reaches the time line ("6:00 AM · Oct 18, 2026") holds
      the whole post, so even a few hidden characters count; without it, the
-     picture must show at least 10 characters beyond X's free text.
+     picture must show at least 10 characters beyond X's free text. If it
+     shows nothing beyond X's text, X's text is the whole post (X marks some
+     short posts as long) and is posted as is.
    - A link in the hidden part can't be read off a picture: the bot asks, in
      a task comment, for the link to be pasted as a comment.
    - The Internet Archive saves every tweet within seconds but releases them

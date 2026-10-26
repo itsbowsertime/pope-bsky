@@ -136,6 +136,9 @@ export function readScreenshot(ocr, partial) {
   const rest = fromStart.slice(cut.len).trim();
   // A picture down to the time line holds the whole post, so a short hidden part ("22:15-21)") is real.
   const toTime = lines.some((l) => /^\d{1,2}:\d{2}\s*[AP]M\b/i.test(l));
+  // Nothing after X's text, down to the time line: X's free text is the whole post
+  // (X marks some short posts "long"), so post X's own words.
+  if (toTime && !rest) return { text: shown };
   if (rest.length < (toTime ? 1 : 10)) return { problem: "the picture shows no more than X does — is it the whole post?" };
   if (/\b[a-z0-9-]+\.(va|com|org|net|it|ly|co|be|gl)\/\S*/i.test(rest)) return { problem: "link" };
   // Join: X's exact text (keeping its line breaks), then the rest from the picture.

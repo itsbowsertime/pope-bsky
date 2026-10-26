@@ -94,6 +94,14 @@ Newest last. Each entry: what was decided, and why.
 - **The 10-character rule was too strict:** the Oct 18 post's hidden part is
   only "22:15-21)" (9). A picture down to the time line now counts with any
   hidden part; without the time line, 10 characters are still required.
+  (The owner had attached that picture on Oct 25; it posted once this shipped.)
+- **X marks some short posts "long"** (`note_tweet` on a 235-character post,
+  Oct 25). A screenshot down to the time line showing nothing beyond X's text
+  now posts X's own text as is (the owner, OK'd).
+- **Screenshots taken on the Mac** work too: Claude opens the posts in the
+  default browser, the owner screenshots (⌘⇧4, saved as files), Claude
+  OCR-matches each to its post with `readScreenshot`, shows the hidden parts,
+  and attaches them to the tasks through Todoist's API (`/uploads`, then a comment).
 
 ## Ideas and open questions
 
