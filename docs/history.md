@@ -133,7 +133,6 @@ Newest last. Each entry: what was decided, and why.
 ## Ideas and open questions
 
 - Make the repo public (unlimited Actions minutes) — the owner's call.
-- Rotate the app password that was pasted in chat.
 - If X's embeddable timeline stops working: the Archive still works, 2–4 days
   late (`fromArchive` in `live.mjs` is the fallback already).
 - Turn it off if the Vatican starts an official Bluesky account.
