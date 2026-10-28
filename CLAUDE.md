@@ -28,7 +28,7 @@ holds every decision and why. Read both before changing anything.
 ## State of things (update this when it changes)
 
 **Next:** Nothing pending. The first long post went through the `needs-screenshot` flow (#2, 2026-10-27); when the Archive releases it, the bot compares and drops `unchecked`.
-**Waiting on Anna:** nothing.
+**Waiting on the owner:** nothing.
 **Updated:** 2026-10-27
 
 - **Live job running since 2026-10-03**, every 30 min (`live.yml`), **started by a Cloudflare Worker** (`cloudflare/`, the owner's Cloudflare account) because GitHub's schedule dropped most runs. Its `GH_TOKEN` is the fine-grained token `pope-bsky-clock` (this repo only, Actions r/w, no expiry); when runs stop, check that first.
