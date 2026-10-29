@@ -27,8 +27,8 @@ holds every decision and why. Read both before changing anything.
 
 ## State of things (update this when it changes)
 
-**Next:** Claude's tasks are in Todoist › Claude › pope-bsky (🤖). None open.
-**Waiting on the owner:** in Todoist, Inbox tasks labelled @pope-bsky.
+**Next:** Claude's tasks are in Todoist › Claude › PopeBot (🤖). None open.
+**Waiting on the owner:** in Todoist, Inbox tasks labelled @popebot.
 **Updated:** 2026-10-28
 
 - **Live job running since 2026-10-03**, every 30 min (`live.yml`), **started by a Cloudflare Worker** (`cloudflare/`, the owner's Cloudflare account) because GitHub's schedule dropped most runs. Its `GH_TOKEN` is the fine-grained token `pope-bsky-clock` (this repo only, Actions r/w, no expiry); when runs stop, check that first.
