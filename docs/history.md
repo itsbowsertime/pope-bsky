@@ -130,6 +130,14 @@ Newest last. Each entry: what was decided, and why.
 - `gh workflow run live.yml -f test=<id>`: a test run for one long tweet
   that opens or reads its issue and posts nothing to Bluesky.
 
+## 2026-11-03 — "|" read as "I"
+
+- tesseract read "I have overcome" as "| have overcome" (#14); the full text
+  was corrected by hand before sending. `screenshot-handoff.mjs` now turns a
+  "|" standing alone as a word (or before 'm, 'll, 've, 'd) into "I" before
+  checking. A "|" inside a word or doubled is left alone. The owner still
+  reads the hidden part before `--send`.
+
 ## Ideas and open questions
 
 - Make the repo public (unlimited Actions minutes) — the owner's call.

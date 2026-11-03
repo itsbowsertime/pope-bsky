@@ -36,6 +36,9 @@ try {
 } catch {
   stop(`tesseract couldn't read ${image} — is it a picture (PNG/JPG)? (brew install tesseract if it's missing)`);
 }
+// tesseract reads a lone capital I as "|" ("| have overcome", 2026-11-03).
+// Only a "|" standing alone as a word (or before 'm, 'll, 've, 'd) changes.
+ocr = ocr.replace(/(^|\s)\|(?=\s|['’](?:m|ll|ve|d)\b)/gm, "$1I");
 let read = readScreenshot(ocr, partial);
 if (read.problem === "link") {
   if (!link) stop("The hidden part has a link, which can't be read off a picture. On X, right-click the link → Copy Link Address, then run this again with --link <url>.");

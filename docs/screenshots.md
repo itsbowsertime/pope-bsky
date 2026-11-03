@@ -24,6 +24,8 @@ For each open issue, oldest first:
    - nothing beyond X's text, down to the time line → X's text is the whole post.
 
    It prints the **hidden part** and the full text, and sends nothing.
+   A lone "|" is read as "I" (tesseract's usual slip); other misreads need a
+   new screenshot.
 4. **Show her the hidden part.** If it reads wrong, take another screenshot.
    - "The hidden part has a link": a link can't be read off a picture. She
      copies it on X (right-click → Copy Link Address); run again with `--link <url>`.
