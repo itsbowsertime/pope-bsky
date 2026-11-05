@@ -2,23 +2,30 @@
 // on X → its full text, as a comment on its needs-screenshot issue, which the
 // bot posts on its next run (after checking it against X itself).
 //
-//   node screenshot-handoff.mjs <issue> <image>                # read it; shows the hidden part, sends nothing
-//   node screenshot-handoff.mjs <issue> <image> --send         # then comment it on the issue
-//   node screenshot-handoff.mjs <issue> <image> --link <url>   # when the hidden part has a link
+//   node screenshot-handoff.mjs <issue>                        # read the newest screenshot; shows the hidden part, sends nothing
+//   node screenshot-handoff.mjs <issue> <image>                # or a given picture
+//   node screenshot-handoff.mjs <issue> [<image>] --send       # then comment it on the issue
+//   node screenshot-handoff.mjs <issue> [<image>] --link <url> # when the hidden part has a link
 //
 // Needs only gh (logged in as the repo owner) and tesseract (brew install tesseract).
 // X's visible text comes from the issue body; nothing is asked of X.
 
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { dirname } from "node:path";
+import { dirname, basename, join } from "node:path";
+import { existsSync, readdirSync, statSync } from "node:fs";
+import { homedir } from "node:os";
 import { readScreenshot, HANDOFF, LINK, idIn } from "./live.mjs";
 
-const [n, image, ...args] = process.argv.slice(2);
+const [n, ...rest] = process.argv.slice(2);
+const given = rest[0]?.startsWith("--") ? null : rest[0];
+const args = given ? rest.slice(1) : rest;
 const send = args.includes("--send");
 const link = args.includes("--link") ? args[args.indexOf("--link") + 1] : null;
 const stop = (msg) => (console.error(msg), process.exit(1));
-if (!/^\d+$/.test(n ?? "") || !image) stop("usage: node screenshot-handoff.mjs <issue number> <image> [--link <url>] [--send]");
+if (!/^\d+$/.test(n ?? "")) stop("usage: node screenshot-handoff.mjs <issue number> [<image>] [--link <url>] [--send]");
+const image = given ? findImage(given) : newestScreenshot();
+console.log(`Image: ${image}`);
 if (link && !/^https?:\/\/\S+$/.test(link)) stop("--link takes the whole link, starting https://");
 
 const gh = (...a) => execFileSync("gh", a, { cwd: dirname(fileURLToPath(import.meta.url)), encoding: "utf8" });
@@ -29,6 +36,29 @@ if (issue.state !== "OPEN") stop(`#${n} is closed (posted, or skipped).`);
 const shown = issue.body.match(/\n~~~text\n([\s\S]*?)\n~~~/)?.[1];
 if (!shown) stop(`#${n} has no X text in its body.`);
 const partial = { id, text: shown, urls: [] };
+
+// macOS puts a narrow no-break space (U+202F) before AM/PM in screenshot names, so a
+// typed name never matches. Leave the image out to take the newest screenshot, or
+// type the name with plain spaces and it's matched with any kind of space.
+function screenshotFolder() {
+  try {
+    const dir = execFileSync("defaults", ["read", "com.apple.screencapture", "location"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    if (dir) return dir.replace(/^~(?=\/|$)/, homedir());
+  } catch {} // not set: macOS's default
+  return join(homedir(), "Desktop");
+}
+function newestScreenshot() {
+  const dir = screenshotFolder();
+  const pics = readdirSync(dir).filter((f) => /\.(png|jpe?g)$/i.test(f)).map((f) => join(dir, f));
+  if (!pics.length) stop(`No screenshots in ${dir}; pass the image's path.`);
+  return pics.sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)[0];
+}
+function findImage(path) {
+  if (existsSync(path)) return path;
+  const dir = dirname(path), plain = (s) => s.replace(/[\s  ]+/g, " ");
+  const match = existsSync(dir) && readdirSync(dir).find((f) => plain(f) === plain(basename(path)));
+  return match ? join(dir, match) : stop(`No file at ${path}. Leave the image out to use the newest screenshot.`);
+}
 
 let ocr;
 try {

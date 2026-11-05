@@ -16,7 +16,10 @@ For each open issue, oldest first:
 2. **She screenshots it:** ⌘⇧4, then drag from his name down to and including
    the time line ("7:40 PM · Sep 28, 2026"). It saves to the Desktop (or
    wherever her screenshots go). Ask for the file if it isn't the newest.
-3. **Read it:** `node screenshot-handoff.mjs <issue> <image>`, in this repo.
+3. **Read it:** `node screenshot-handoff.mjs <issue>`, in this repo. With no image
+   it takes the newest screenshot (it prints which). Don't type a screenshot's name:
+   macOS puts a narrow no-break space before AM/PM in it, though a name typed with
+   plain spaces is matched anyway.
    It reads the picture with tesseract and checks it the way the bot does:
    - the start must match X's visible text (from the issue body) at ≥ 95%;
    - a picture down to the time line counts with any hidden part; without
